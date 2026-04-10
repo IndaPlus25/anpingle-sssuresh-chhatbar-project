@@ -13,3 +13,7 @@ class Game:
 
     def add_player(self, name):
         self.players.append(Player(name))
+
+    def update_stocks(self):
+        for stock in self.stocks:
+            stock.update_price()

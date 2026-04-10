@@ -26,9 +26,17 @@ def run(game):
     computer_rect = pygame.Rect(100, 250, 60, 20)
     interaction_distance = 80
     market_open = False
+    last_update_time = pygame.time.get_ticks()
+
 
     while running:
+        current_time = pygame.time.get_ticks()
+        if current_time - last_update_time > 1000:
+            game.update_stocks()
+            last_update_time = current_time
+
         screen.fill(white)
+
         font = pygame.font.SysFont(None, 30)
         cash_text = font.render(f"Cash: {player.cash}", True, blue)
         screen.blit(cash_text, (20, 20))
@@ -57,6 +65,8 @@ def run(game):
                 elif event.key == pygame.K_q and market_open:
                     market_open = False
 
+
+
         if not market_open:
             keys = pygame.key.get_pressed()
             if keys[pygame.K_a]:
@@ -71,14 +81,15 @@ def run(game):
             header = font.render("Stock Market", True, green)
             screen.blit(header, (market_box.x + 15, market_box.y + 12))
 
-            close_text = font.render("Press Esc or Q to close", True, white)
+            close_text = font.render("Press Q to close", True, white)
             screen.blit(close_text, (market_box.x + 15, market_box.y + 180))
 
             row_y = market_box.y + 50
             for stock in game.stocks:
-                stock_line = font.render(f"{stock.name}: ${stock.price}", True, white)
+                stock_line = font.render(f"{stock.name}: ${stock.price:.2f}", True, white)
                 screen.blit(stock_line, (market_box.x + 15, row_y))
                 row_y += 35
+
 
         pygame.display.flip()
         clock.tick(60)
