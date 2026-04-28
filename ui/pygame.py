@@ -81,7 +81,7 @@ def run(game):
             header = font.render("Stock Market", True, green)
             screen.blit(header, (market_box.x + 15, market_box.y + 12))
 
-            close_text = font.render("Press Q to close", True, white)
+            close_text = font.render("Press q to close", True, white)
             screen.blit(close_text, (market_box.x + 15, market_box.y + 180))
 
             row_y = market_box.y + 50
