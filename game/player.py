@@ -4,7 +4,7 @@ class Player:
         self.cash = 1000000
         self.portfolio = {}
         self.x = 300
-        self.y = 300
+        self.y = 200
 
     def move(self, dx):
         self.x += dx
