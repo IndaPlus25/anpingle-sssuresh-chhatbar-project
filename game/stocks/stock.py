@@ -1,6 +1,7 @@
 import random
 import math
-from .patterns import PATTERNS, PATTERN_META
+from .patterns import PATTERNS
+from .metadata import PATTERN_META
 
 
 class Stock:
