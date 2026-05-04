@@ -1,5 +1,5 @@
 from .player import Player
-from .stock import Stock
+from .stocks.stock import Stock
 
 class Game:
     def __init__(self):
