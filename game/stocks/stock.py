@@ -27,7 +27,7 @@ class Candle:
         return self.close < self.open
 
     def is_doji(self, threshold=0.001):
-        """Check if candle is a doji (body very small relative to range)."""
+        """Check if candle is a doji (body very small relative to candle)."""
         body = abs(self.close - self.open)
         range_ = self.high - self.low
         return range_ > 0 and body / range_ < threshold
@@ -58,11 +58,17 @@ class Stock:
         # Initialize first candle
         self._start_new_candle()
 
-    def inject_pattern(self, ticks, drift, segments):
-        """Force a directional drift for a number of ticks."""
-        self._pattern_queue = [[ticks, drift] for ticks, drift in segments]
+    def inject_pattern(self, segments):
+        """Force a directional drift for a number of ticks.
+
+        Args:
+            segments: List of [ticks, drift] tuples defining the pattern
+        """
+        self._pattern_queue = [list(segment) for segment in segments]
         self._active_segment = None
         self.current_pattern_name = None
+        # Calculate total ticks for progress tracking
+        self._pattern_total_ticks = sum(s[0] for s in segments)
 
     def inject_named_pattern(self, name):
         if name not in PATTERNS:
@@ -70,8 +76,9 @@ class Stock:
             raise KeyError(
                 f"unknown pattern '{name}'. Available patterns: {available}"
             )
-        
-        self.inject_pattern(*PATTERNS[name])
+
+        segments = PATTERNS[name]
+        self.inject_pattern(segments)
         self.current_pattern_name = name
 
     def get_pattern_meta(self, name=None):
@@ -130,9 +137,12 @@ class Stock:
         self.price = max(0.01, round(self.price, 2))
         self.history.append(self.price)
 
-        # Update current candle
+        # Update current candle and finalize if complete
         if record_candle and self._current_candle is not None:
             self._current_candle.update(self.price)
+            # Finalize candle after candles_per_tick ticks
+            if self._current_candle.tick >= self.candles_per_tick:
+                self.finalize_candle()
 
     def step(self, n=1):
         """Advance n ticks at once. Optionally finalize candles after steps."""
