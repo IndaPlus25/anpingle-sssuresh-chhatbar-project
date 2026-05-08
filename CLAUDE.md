@@ -30,8 +30,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 │   └── animations.py    # 8-way directional animation loader
 └── assets/
     └── candlestick_assets/
-        ├── patterns.py  # Pattern labels and colors for UI display
-        └── candles.py   # Candle visualization helper functions
+        └── stock_assets.py  # Consolidated candle rendering + pattern labels/colors
 ```
 
 ## Key Components
