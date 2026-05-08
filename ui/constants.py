@@ -39,3 +39,34 @@ MAP_PROPS = [
     {"type": "box_01", "x": 60, "y": 430}, 
     {"type": "box_02", "x": 350, "y": 600}, 
 ]
+GAME_HOUR_MS = 2000
+AVAILABLE_EMPLOYEES = [
+    {
+        "id": "emp1", 
+        "name": "Junior Trader", 
+        "salary": 30, 
+        "max_energy": 100, 
+        "effectiveness": 1.0, 
+        "folder": "ui/characters/employee1",
+        "portrait": "ui/assets/portraits/emp1.png" 
+    },
+    {
+        "id": "emp2", 
+        "name": "Senior Analyst", 
+        "salary": 80, 
+        "max_energy": 150, 
+        "effectiveness": 1.4, 
+        "folder": "ui/characters/employee2",
+        "portrait": "ui/assets/portraits/emp2.png"
+    },
+    {
+        "id": "emp3", 
+        "name": "Senior Analyst", 
+        "salary": 100, 
+        "max_energy": 100, 
+        "effectiveness": 2.0, 
+        "folder": "ui/characters/employee3",
+        "portrait": "ui/assets/portraits/emp3.png"
+    }
+
+]
