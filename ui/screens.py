@@ -342,10 +342,6 @@ def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, 
         })
         
         shop_y += 125
-    
-    # ═══════════════════════════════════════════════════════════
-    # RENDER ACTIVE EMPLOYEES
-    # ═══════════════════════════════════════════════════════════
     active_y = right_y + 60
     
     if len(active_staff) == 0:
