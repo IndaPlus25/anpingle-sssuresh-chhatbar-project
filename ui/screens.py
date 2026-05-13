@@ -96,71 +96,94 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks):
         
     close_hint = small_font.render("Press Q to close", True, GRAY)
     game_surface.blit(close_hint, (box.x + 30, box.y + box.height - 40))
-def draw_shop_overlay(game_surface, body_font, small_font, player, icon_coin, desks_assets, owned_desks, current_desk_id):
-    """shop overlay"""
+    
+def draw_shop_overlay(game_surface, body_font, small_font, player, icon_coin, thumbnails, owned_items, equipped_items, shop_tab, scroll_y):
+    """Draws the scrollable, tabbed shop overlay."""
     from .constants import BLUE, GOLD, GREEN, GRAY, PANEL, WHITE, SHOP_ITEMS
     
     win_w, win_h = 700, 500
     win_x, win_y = (game_surface.get_width() - win_w) // 2, (game_surface.get_height() - win_h) // 2
     box = pygame.Rect(win_x, win_y, win_w, win_h)
     
+    # Draw Background
     pygame.draw.rect(game_surface, (40, 45, 60), box, border_radius=8)
     pygame.draw.rect(game_surface, PANEL, box.inflate(-10, -50), border_radius=4)
     
-    title = body_font.render("Shop - Upgrades", True, WHITE)
+    title = body_font.render("Shop", True, WHITE)
     game_surface.blit(title, (box.x + 20, box.y + 10))
-    close_hint = small_font.render("Press ESC to close", True, GRAY)
-    game_surface.blit(close_hint, (box.x + win_w - close_hint.get_width() - 20, box.y + 15))
-
-    buy_buttons = []
-    row_y = win_y + 60
     
-    for item in SHOP_ITEMS:
-        row_rect = pygame.Rect(win_x + 20, row_y, win_w - 40, 70)
-        pygame.draw.rect(game_surface, (35, 40, 55), row_rect, border_radius=6)
-        pygame.draw.rect(game_surface, (50, 60, 80), row_rect, 1, border_radius=6)
-        
-        # Draw Thumbnail Image
-        desk_img = desks_assets.get(item["id"])
-        if desk_img:
-            # Scale it down for the list view
-            thumb = pygame.transform.scale(desk_img, (75, 55))
-            game_surface.blit(thumb, (row_rect.x + 10, row_rect.y + 5))
-        
-        # Item Name
-        name_text = small_font.render(item["name"], True, WHITE)
-        game_surface.blit(name_text, (row_rect.x + 100, row_rect.y + 3))
-        
-        # Price
-        if icon_coin:
-            game_surface.blit(icon_coin, (row_rect.x + 100, row_rect.y + 30))
-        price_text = small_font.render(f"${item['price']:,}", True, GOLD)
-        game_surface.blit(price_text, (row_rect.x + 140, row_rect.y + 33))
-        
-        # Button
-        btn_rect = pygame.Rect(row_rect.right - 140, row_rect.y + 15, 120, 40)
-        is_owned = item["id"] in owned_desks
-        is_equipped = item["id"] == current_desk_id
-        
-        if is_equipped:
-            btn_text = "Equipped"
-            btn_color = GRAY
-        elif is_owned:
-            btn_text = "Equip"
-            btn_color = BLUE
-        else:
-            can_afford = player.cash >= item["price"]
-            btn_text = "Buy"
-            btn_color = GREEN if can_afford else (140, 40, 40)
-        
-        draw_button(game_surface, btn_rect, btn_text, small_font, color=btn_color)
+    close_btn = draw_close_button(game_surface, box.right - 50, box.y + 10, small_font)
 
-        buy_buttons.append((btn_rect, item, btn_text)) 
+    categories = ["Desks", "Walls", "Plants", "Upgrades"]
+    tab_buttons = []
+    tab_x = box.x + 150
+    
+    for cat in categories:
+        tab_rect = pygame.Rect(tab_x, box.y + 15, 100, 30)
+        is_active = (cat == shop_tab)
+        bg_color = (60, 80, 160) if is_active else (50, 55, 75)
+        text_color = WHITE if is_active else GRAY
         
+        pygame.draw.rect(game_surface, bg_color, tab_rect, border_radius=4)
+        if is_active:
+            pygame.draw.rect(game_surface, GOLD, tab_rect, 1, border_radius=4)
+            
+        cat_text = small_font.render(cat, True, text_color)
+        game_surface.blit(cat_text, cat_text.get_rect(center=tab_rect.center))
+        
+        tab_buttons.append({"rect": tab_rect, "category": cat})
+        tab_x += 110
+
+    filtered_items = [item for item in SHOP_ITEMS if item.get("category", "Desks") == shop_tab]
+    list_rect = pygame.Rect(box.x + 10, box.y + 60, win_w - 20, win_h - 70)
+    
+    total_content_height = len(filtered_items) * 85
+    max_scroll = min(0, list_rect.height - total_content_height - 20)
+    
+    if scroll_y > 0: scroll_y = 0
+    if scroll_y < max_scroll: scroll_y = max_scroll
+
+    game_surface.set_clip(list_rect)
+    
+    buy_buttons = []
+    row_y = list_rect.y + 10 + scroll_y 
+    
+    for item in filtered_items:
+        row_rect = pygame.Rect(win_x + 20, row_y, win_w - 40, 70)
+        
+        if row_rect.bottom > list_rect.top and row_rect.top < list_rect.bottom:
+            pygame.draw.rect(game_surface, (35, 40, 55), row_rect, border_radius=6)
+            pygame.draw.rect(game_surface, (50, 60, 80), row_rect, 1, border_radius=6)
+            
+            thumb = thumbnails.get(item["id"])
+            if thumb: game_surface.blit(thumb, (row_rect.x + 10, row_rect.y + 5))
+            
+            name_text = small_font.render(item["name"], True, WHITE)
+            game_surface.blit(name_text, (row_rect.x + 100, row_rect.y + 3))
+            
+            if icon_coin: game_surface.blit(icon_coin, (row_rect.x + 100, row_rect.y + 30))
+            price_text = small_font.render(f"${item['price']:,}", True, GOLD)
+            game_surface.blit(price_text, (row_rect.x + 140, row_rect.y + 33))
+            
+            btn_rect = pygame.Rect(row_rect.right - 140, row_rect.y + 15, 120, 40)
+            is_owned = item["id"] in owned_items
+            is_equipped = item["id"] == equipped_items.get(shop_tab)
+            
+            if is_equipped: btn_text, btn_color = "Equipped", GRAY
+            elif is_owned: btn_text, btn_color = "Equip", BLUE
+            else:
+                can_afford = player.cash >= item["price"]
+                btn_text, btn_color = "Buy", GREEN if can_afford else (140, 40, 40)
+            
+            draw_button(game_surface, btn_rect, btn_text, small_font, color=btn_color)
+            buy_buttons.append((btn_rect, item, btn_text)) 
+            
         row_y += 85 
         
-    return buy_buttons
-
+    game_surface.set_clip(None) 
+    
+    # --- NEW: Return the perfectly clamped scroll_y and the close button rect ---
+    return buy_buttons, tab_buttons, scroll_y, close_btn
 
 def draw_confirmation_screen(game_surface, body_font, small_font, prompt_text):
     """yes/no"""
@@ -189,3 +212,15 @@ def draw_confirmation_screen(game_surface, body_font, small_font, prompt_text):
     draw_button(game_surface, no_btn, "No", small_font, color=(140, 40, 40))
 
     return yes_btn, no_btn
+
+def draw_close_button(game_surface, x, y, font):
+    """Draws a red rectangular close button with an X."""
+    btn_rect = pygame.Rect(x, y, 40, 40)
+    pygame.draw.rect(game_surface, (180, 50, 50), btn_rect, border_radius=6)
+    pygame.draw.rect(game_surface, (255, 100, 100), btn_rect, 2, border_radius=6)
+    
+    x_text = font.render("X", True, (255, 255, 255))
+    # Push the X slightly up/down depending on your font so it centers perfectly
+    game_surface.blit(x_text, x_text.get_rect(center=btn_rect.center))
+    
+    return btn_rect
