@@ -21,15 +21,22 @@ CHARACTERS = [
     {"name": "Morgan", "file": "ui/characters/char2.png", "desc": "Risk taker"},
     {"name": "Jordan", "file": "ui/characters/char3.png", "desc": "Market analyst"},
 ]
-# shop
 
+# shop
 SHOP_ITEMS = [
-    {"id": "desk1", "name": "Basic Desk",      "price": 0,    "file": "ui/assets/desks/desk1.png"},
-    {"id": "desk2", "name": "Standard Desk",   "price": 5000,  "file": "ui/assets/desks/desk2.png"},
-    {"id": "desk3", "name": "Executive Desk",  "price": 12000, "file": "ui/assets/desks/desk3.png"},
-    {"id": "desk4", "name": "Trading Station", "price": 25000, "file": "ui/assets/desks/desk4.png"},
-    {"id": "desk5", "name": "Hedge Fund Rig",  "price": 50000, "file": "ui/assets/desks/desk5.png"},
+    {"id": "desk1", "name": "Basic Desk",      "price": 0,    "file": "ui/assets/desks/desk1.png","category": "Desks"},
+    {"id": "desk2", "name": "Standard Desk",   "price": 5000,  "file": "ui/assets/desks/desk2.png","category": "Desks"},
+    {"id": "desk3", "name": "Executive Desk",  "price": 12000, "file": "ui/assets/desks/desk3.png","category": "Desks"},
+    {"id": "desk4", "name": "Trading Station", "price": 25000, "file": "ui/assets/desks/desk4.png","category": "Desks"},
+    {"id": "desk5", "name": "Hedge Fund Rig",  "price": 50000, "file": "ui/assets/desks/desk5.png","category": "Desks"},
+    {"id": "wall1", "name": "Basic Brick",  "price": 0, "file": "ui/backgrounds/walls/walls_01.png","category": "Walls"},
+    {"id": "wall2", "name": "Industrial Plating",  "price": 50000, "file": "ui/backgrounds/walls/walls_02.png","category": "Walls"},
+    {"id": "wall3", "name": "Refurbished Steel",  "price": 100000, "file": "ui/backgrounds/walls/walls_03.png","category": "Walls"},
+    {"id": "wall4", "name": "Modern Corporate",  "price": 500000, "file": "ui/backgrounds/walls/walls_04.png","category": "Walls"},
+    {"id": "wall5", "name": "Cyber Grid",  "price": 1000000, "file": "ui/backgrounds/walls/walls_05.png","category": "Walls"},
 ]
+
+# map assets
 MAP_PROPS = [
     {"type": "water", "x": 355, "y": 70},
     {"type": "locker_03", "x": 673, "y": 75},
@@ -70,3 +77,6 @@ AVAILABLE_EMPLOYEES = [
     }
 
 ]
+
+#game time per hour
+GAME_MINUTE_MS = 500
