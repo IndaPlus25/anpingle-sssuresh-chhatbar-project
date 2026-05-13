@@ -1,32 +1,45 @@
 import pygame
 from ui.constants import GAME_W, GAME_H
+from features.collision import move_with_collision
 
-def handle_player_movement(player, move_speed, anim_frame):
-    """player movement"""
+def handle_player_movement(player, speed, anim_frame, assets):
     keys = pygame.key.get_pressed()
     dx, dy = 0, 0
-    
-    if keys[pygame.K_a]: dx = -move_speed
-    if keys[pygame.K_d]: dx = move_speed
-    if keys[pygame.K_w]: dy = -move_speed
-    if keys[pygame.K_s]: dy = move_speed
-    
-    player.x = max(0, min(player.x + dx, GAME_W - 64))
-    player.y = max(0, min(player.y + dy, GAME_H - 64))
+    is_moving = False
 
-    if dx != 0 or dy != 0:
-        player.is_moving = True
-        dir_str = ""
-        if dy < 0: dir_str += "north"
-        elif dy > 0: dir_str += "south"
-        if dx < 0: dir_str += "west"
-        elif dx > 0: dir_str += "east"
-        player.direction = dir_str
-        anim_frame = (anim_frame + 0.12) % 6
+    if keys[pygame.K_w] or keys[pygame.K_UP]: 
+        dy -= speed
+        player.direction = "north"
+        is_moving = True
+    if keys[pygame.K_s] or keys[pygame.K_DOWN]: 
+        dy += speed
+        player.direction = "south"
+        is_moving = True
+    if keys[pygame.K_a] or keys[pygame.K_LEFT]: 
+        dx -= speed
+        player.direction = "west"
+        is_moving = True
+    if keys[pygame.K_d] or keys[pygame.K_RIGHT]: 
+        dx += speed
+        player.direction = "east"
+        is_moving = True
+
+    if dx < 0 and dy < 0: player.direction = "northwest"
+    elif dx > 0 and dy < 0: player.direction = "northeast"
+    elif dx < 0 and dy > 0: player.direction = "southwest"
+    elif dx > 0 and dy > 0: player.direction = "southeast"
+
+
+    if dx != 0 and dy != 0:
+        dx *= 0.7071
+        dy *= 0.7071
+    player.is_moving = is_moving
+    if is_moving:
+        move_with_collision(player, dx, dy, assets["walls_mask"], assets["feet_mask"], props_collision=assets["props_collision"],char_width=64, char_height=64, custom_offset_x=30, custom_offset_y=65)
+        anim_frame = (anim_frame + 0.15) % 6
     else:
-        player.is_moving = False
         anim_frame = 0
-        
+
     return anim_frame
 
 def draw_player(game_surface, player, anim_frame, current_anims, fallback_image):
