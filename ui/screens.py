@@ -464,18 +464,15 @@ def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, 
     title = body_font.render("⚡ STAFF MANAGEMENT", True, GOLD)
     game_surface.blit(title, (win_x + 30, win_y + 15))
     
-    # Close hint
-    close_hint = small_font.render("Press T to close", True, GRAY)
-    game_surface.blit(close_hint, (win_x + win_w - close_hint.get_width() - 30, win_y + 20))
+    # --- NEW: Draw the Close Button ---
+    close_btn = draw_close_button(game_surface, win_x + win_w - 60, win_y + 10, small_font)
     
     # Split into 2 sections
     left_w = 520
     right_w = win_w - left_w - 60
     section_h = win_h - 90
     
-
-    #Employee Shop
-
+    # Employee Shop
     left_x = win_x + 20
     left_y = win_y + 75
     left_box = pygame.Rect(left_x, left_y, left_w, section_h)
@@ -488,9 +485,7 @@ def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, 
     game_surface.blit(shop_title, (left_x + 15, left_y + 10))
     pygame.draw.line(game_surface, (60, 70, 85), (left_x + 10, left_y + 45), (left_x + left_w - 10, left_y + 45), 1)
     
-
     # Active Employees
-
     right_x = left_x + left_w + 20
     right_y = left_y
     right_box = pygame.Rect(right_x, right_y, right_w, section_h)
@@ -511,9 +506,7 @@ def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, 
     
     pygame.draw.line(game_surface, (60, 70, 85), (right_x + 10, right_y + 45), (right_x + right_w - 10, right_y + 45), 1)
     
-
     # RENDER SHOP EMPLOYEES
-  
     staff_buttons = []
     shop_y = left_y + 60
     
@@ -667,8 +660,9 @@ def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, 
                     break
             
             active_y += 100
-    
-    return staff_buttons
+ 
+    return staff_buttons, close_btn
+
 def draw_news_screen(game_surface, title_font, body_font, small_font, news_items, scroll_offset=0):
     """
     News feed screen showing stock-related headlines.
@@ -894,3 +888,39 @@ def draw_close_button(game_surface, x, y, font):
     game_surface.blit(x_text, x_text.get_rect(center=btn_rect.center))
     
     return btn_rect
+
+def draw_sleep_bubble(game_surface, x, y, font):
+    """Draws a speech bubble for resting employees."""
+
+    white = (255, 255, 255)
+    dark_blue = (25, 30, 60)       
+    shadow_color = (180, 190, 220) 
+
+    bubble_w = 48
+    bubble_h = 32
+
+    tail_pts = [(x + 12, y + bubble_h - 2),  
+                (x + 22, y + bubble_h - 2),  
+                (x + 12, y + bubble_h + 8)]  
+    
+    pygame.draw.polygon(game_surface, shadow_color, tail_pts)
+    pygame.draw.polygon(game_surface, dark_blue, tail_pts, 2) 
+    full_rect = pygame.Rect(x, y, bubble_w, bubble_h)
+    pygame.draw.rect(game_surface, shadow_color, full_rect, border_radius=6)
+
+    white_rect = pygame.Rect(x, y, bubble_w, bubble_h - 4)
+    pygame.draw.rect(game_surface, white, white_rect, border_radius=6)
+
+    #  Draw the main outer border
+    pygame.draw.rect(game_surface, dark_blue, full_rect, width=2, border_radius=6)
+
+    pygame.draw.line(game_surface, shadow_color, (x + 14, y + bubble_h - 2), (x + 20, y + bubble_h - 2), 2)
+
+    z1 = font.render("Z", True, dark_blue)
+    z2 = font.render("z", True, dark_blue)
+    z3 = font.render("z", True, dark_blue)
+
+
+    game_surface.blit(z1, (x + 14, y))
+    game_surface.blit(z2, (x + 26, y + 7))
+    game_surface.blit(z3, (x + 16, y + 10))

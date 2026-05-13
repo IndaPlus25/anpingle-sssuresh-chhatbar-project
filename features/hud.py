@@ -41,7 +41,15 @@ def draw_top_bar(game_surface, hud_font, small_font, bold_font, player, icon_coi
     if icon_coin: game_surface.blit(icon_coin, (12, 7))
     
     cash_val = player.cash
-    cash_text_str = f"${cash_val/1000000:.1f}M" if cash_val >= 1000000 else f"${cash_val/1000:.0f}K"
+    
+    if cash_val >= 1000000:
+        rounded_m = (cash_val // 100000) / 10.0
+        cash_text_str = f"${rounded_m:.1f}M"
+    else:
+
+        rounded_k = cash_val // 1000
+        cash_text_str = f"${rounded_k}K"
+        
     game_surface.blit(hud_font.render(cash_text_str, True, GOLD), (70, 5))
     
     draw_stock_ticker(game_surface, small_font, bold_font, ticker_offset, stocks, stock_prev_prices)
@@ -51,7 +59,6 @@ def draw_top_bar(game_surface, hud_font, small_font, bold_font, player, icon_coi
     menu_lines = small_font.render("≡", True, LGRAY)
     game_surface.blit(menu_lines, menu_lines.get_rect(center=menu_btn.center))
     return menu_btn
-
 def draw_clock_overlay(game_surface, small_font, hud_font, game_clock):
     #Draws clock
     date_str = game_clock.get_date_string()
