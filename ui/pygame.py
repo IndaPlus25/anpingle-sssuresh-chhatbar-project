@@ -713,11 +713,11 @@ def run(game):
                 assets["current_desk_id"]
             )
 
-                # Randomly inject candlestick patterns
-                for stock in game.stocks:
-                    if not stock.is_pattern_active() and random.random() < PATTERN_INJECT_CHANCE:
-                        pattern_key = random.choice(pattern_keys)
-                        stock.inject_named_pattern(pattern_key)
+            # Randomly inject candlestick patterns
+            for stock in game.stocks:
+                if not stock.is_pattern_active() and random.random() < PATTERN_INJECT_CHANCE:
+                    pattern_key = random.choice(pattern_keys)
+                    stock.inject_named_pattern(pattern_key)
 
             game_surface.blit(assets["bg"], (0, 0))
             
@@ -753,6 +753,7 @@ def run(game):
                 game_surface,
                 assets["hud_font"],
                 assets["small_font"],
+                assets["hud_bold_font"],
                 player,
                 assets["icon_coin"],
                 ticker_offset,
