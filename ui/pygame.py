@@ -297,6 +297,7 @@ def run(game):
     shop_scroll_y = 0
     owned_items = ["desk1", "wall1"]
     shop_close_btn = pygame.Rect(0,0,0,0)
+    staff_close_btn = pygame.Rect(0,0,0,0)
 
     confirm_open = False
     pending_item = None
@@ -587,6 +588,8 @@ def run(game):
                                             item["id"]
                                         )
                         if staff_open:
+                            if staff_close_btn.collidepoint(gpt):
+                                staff_open = False
                             for btn in staff_buttons:
                                 emp_id = btn["id"]
                                 if btn["hire_rect"].collidepoint(gpt) and emp_id not in active_staff:
@@ -688,11 +691,7 @@ def run(game):
                 last_update = pygame.time.get_ticks()
                 
             
-            game_hour_timer += dt
-            if game_hour_timer >= GAME_HOUR_MS:
-                game_hour_timer -= GAME_HOUR_MS
-                for emp_id, emp_npc in active_staff.items():
-                    player.cash -= emp_npc.config["salary"]
+
 
             # =========================
             # NEWS GENERATION
@@ -789,13 +788,25 @@ def run(game):
             if not any([market_open, shop_open, staff_open, confirm_open]):
                     anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
                     game_clock.update(dt)
+                    game_hour_timer += dt
+                    if game_hour_timer >= GAME_HOUR_MS:
+                        game_hour_timer -= GAME_HOUR_MS
+                        
+                        total_salary_paid = 0
+                        for emp_id, emp_npc in active_staff.items():
+                            salary = emp_npc.config["salary"]
+                            player.cash -= salary
+                            total_salary_paid += salary
+                            
+
+
                     for emp_id, emp_npc in active_staff.items():
-                        emp_npc.update(dt)
+                        emp_npc.update(dt, assets)
                 
             # 7. Draw Entities
             for emp_id, emp_npc in active_staff.items():
                 if emp_id in assets["staff_anims"]:
-                    emp_npc.draw(game_surface, assets["staff_anims"][emp_id])
+                    emp_npc.draw(game_surface, assets["staff_anims"][emp_id], assets["small_font"])
                     
 
             draw_clock_overlay(game_surface, assets["small_font"], assets["hud_font"], game_clock)
@@ -842,7 +853,7 @@ def run(game):
                 )
                 
             if staff_open:
-                staff_buttons = draw_staff_panel_overlay(
+                staff_buttons, staff_close_btn = draw_staff_panel_overlay(
                     game_surface, assets["body_font"], assets["small_font"], 
                     active_staff, AVAILABLE_EMPLOYEES, assets["staff_portraits"]
                 )
