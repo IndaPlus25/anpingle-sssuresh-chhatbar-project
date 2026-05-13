@@ -1,7 +1,7 @@
 class Player:
     def __init__(self, name):
         self.name = name
-        self.cash = 1000000
+        self.cash = 1000000000
         self.portfolio = {}
         self.x = 300
         self.y = 200
