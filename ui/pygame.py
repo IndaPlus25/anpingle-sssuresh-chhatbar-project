@@ -415,7 +415,7 @@ def run(game):
             if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
             
             if not market_open and not shop_open and not confirm_open:
-                anim_frame = handle_player_movement(player, 3.5, anim_frame)
+                anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
                 game_clock.update(dt) 
 
             draw_clock_overlay(game_surface, assets["small_font"], assets["hud_font"], game_clock)
