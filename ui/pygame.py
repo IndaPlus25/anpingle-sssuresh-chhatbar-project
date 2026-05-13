@@ -1,12 +1,32 @@
 import pygame
 import sys
+import random
 
 from .constants import *
 from .screens import draw_menu, draw_char_select, draw_market_overlay, draw_shop_overlay, draw_confirmation_screen
+from .assets.stock_assets import (
+    CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info
+)
+from .assets import stock_assets as pattern_assets
 from features.interaction import mouse_clicked_in_game
 from features.hud import draw_top_bar
 from features.assets import load_all_assets
 from features.player import handle_player_movement, draw_player
+from game.stocks.patterns import PATTERNS as _ALL_PATTERNS
+
+# Candlestick color aliases used by draw_candle / draw_stock_chart
+light_green = CANDLE_COLORS["bullish"]["body"]
+dark_green  = CANDLE_COLORS["bullish"]["border"]
+light_red   = CANDLE_COLORS["bearish"]["body"]
+dark_red    = CANDLE_COLORS["bearish"]["border"]
+
+# General color aliases (lowercase) used throughout chart rendering
+black      = (0, 0, 0)
+gray       = (140, 140, 160)
+light_gray = (240, 240, 240)
+green      = (0, 200, 100)
+red        = (255, 0, 0)
+blue       = (50, 130, 255)
 
 # Chart settings
 CHART_WIDTH = 400
@@ -315,10 +335,16 @@ def run(game):
     market_open = False
     shop_open = False
     buy_buttons = []
+    selected_stock_idx = 0
+    market_arrow_left = market_arrow_right = pygame.Rect(0,0,0,0)
     
     owned_desks = ["desk1"]
     confirm_open = False
     pending_item = None
+
+    # Pattern injection tracking
+    pattern_keys = list(_ALL_PATTERNS.keys())
+    PATTERN_INJECT_CHANCE = 0.20  # 20% chance per stock per tick
     
     last_update = pygame.time.get_ticks()
     stock_prev_prices = {stock.name: stock.price for stock in game.stocks}
@@ -350,6 +376,10 @@ def run(game):
                             shop_open = False
                     elif event.key == pygame.K_q and market_open: 
                         market_open = False
+                    elif market_open and event.key == pygame.K_LEFT:
+                        selected_stock_idx = (selected_stock_idx - 1) % len(game.stocks)
+                    elif market_open and event.key == pygame.K_RIGHT:
+                        selected_stock_idx = (selected_stock_idx + 1) % len(game.stocks)
                     elif event.key == pygame.K_TAB and not confirm_open:  
                         shop_open = not shop_open
                         market_open = False
@@ -388,6 +418,12 @@ def run(game):
                             market_open = False
                             shop_open = False
                             
+                        if market_open:
+                            if market_arrow_left.collidepoint(gpt):
+                                selected_stock_idx = (selected_stock_idx - 1) % len(game.stocks)
+                            elif market_arrow_right.collidepoint(gpt):
+                                selected_stock_idx = (selected_stock_idx + 1) % len(game.stocks)
+
                         if shop_open:
                             for btn_rect, item, btn_text in buy_buttons:
                                 if btn_rect.collidepoint(gpt):
@@ -416,6 +452,12 @@ def run(game):
                 stock_prev_prices = {stock.name: stock.price for stock in game.stocks}
                 game.update_stocks()
                 last_update = pygame.time.get_ticks()
+
+                # Randomly inject candlestick patterns
+                for stock in game.stocks:
+                    if not stock.is_pattern_active() and random.random() < PATTERN_INJECT_CHANCE:
+                        pattern_key = random.choice(pattern_keys)
+                        stock.inject_named_pattern(pattern_key)
 
             game_surface.blit(assets["bg"], (0, 0))
             current_desk = assets["desks"].get(assets["current_desk_id"])
@@ -446,7 +488,10 @@ def run(game):
                 game_surface.blit(assets["hud_font"].render("Press E to interact", True, GREEN), (assets["computer_rect"].x - 20, assets["computer_rect"].y - 60))
 
             if market_open:
-                draw_market_overlay(game_surface, assets["body_font"], assets["hud_font"], assets["small_font"], game.stocks)
+                market_arrow_left, market_arrow_right = draw_market_overlay(
+                    game_surface, assets["body_font"], assets["hud_font"],
+                    assets["small_font"], game.stocks, selected_stock_idx
+                )
                 
             if shop_open:
                 buy_buttons = draw_shop_overlay(
