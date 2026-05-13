@@ -7,11 +7,16 @@ def load_all_assets():
     assets = {}
     
     # Fonts
-    font_path = "ui/fonts/Pixelify_Sans/static/PixelifySans-Bold.ttf"
-    assets["title_font"] = pygame.font.Font(font_path, 64)
-    assets["body_font"]  = pygame.font.Font(font_path, 36)
-    assets["small_font"] = pygame.font.Font(font_path, 24)
-    assets["hud_font"]   = pygame.font.Font(font_path, 32)
+    pixelify_path = "ui/fonts/Pixelify_Sans/static/PixelifySans-Bold.ttf"
+    monogram_path = "ui/fonts/monogram/ttf/monogram.ttf"
+    # font_path = "ui/fonts/pixellari/Pixellari.ttf"
+    # font_path = "ui/fonts/m5x7.ttf"
+    # font_path = "ui/fonts/thaleahfat/ThaleahFat.ttf"
+    assets["title_font"] = pygame.font.Font(pixelify_path, 64)
+    assets["body_font"]  = pygame.font.Font(pixelify_path, 36)
+    assets["hud_bold_font"] = pygame.font.Font(pixelify_path, 24)
+    assets["small_font"] = pygame.font.Font(monogram_path, 24)
+    assets["hud_font"]   = pygame.font.Font(monogram_path, 32)
 
     #Backgrounds
     try: 

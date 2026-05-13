@@ -9,9 +9,10 @@ from .assets.stock_assets import (
 )
 from .assets import stock_assets as pattern_assets
 from features.interaction import mouse_clicked_in_game
-from features.hud import draw_top_bar
+from features.hud import draw_top_bar, draw_clock_overlay
 from features.assets import load_all_assets
 from features.player import handle_player_movement, draw_player
+from features.clock import GameClock
 from game.stocks.patterns import PATTERNS as _ALL_PATTERNS
 
 # Candlestick color aliases used by draw_candle / draw_stock_chart
@@ -228,6 +229,9 @@ def run(game):
     clock = pygame.time.Clock()
     player = game.players[0]
     
+    game_clock = GameClock()
+    dt = 16 
+
     state = "menu"
     running = True
 
@@ -404,15 +408,18 @@ def run(game):
                     game_surface.blit(prop_img, (prop["x"], prop["y"]))
 
             menu_btn_rect = draw_top_bar(
-                game_surface, assets["hud_font"], assets["small_font"], player, 
+                game_surface, assets["hud_font"], assets["small_font"], assets["hud_bold_font"],player, 
                 assets["icon_coin"], ticker_offset, game.stocks, stock_prev_prices
             )
             ticker_offset -= 1.5
             if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
             
             if not market_open and not shop_open and not confirm_open:
-                anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
-                
+                anim_frame = handle_player_movement(player, 3.5, anim_frame)
+                game_clock.update(dt) 
+
+            draw_clock_overlay(game_surface, assets["small_font"], assets["hud_font"], game_clock)
+
             p_rect = draw_player(
                 game_surface, player, anim_frame, 
                 assets["all_char_anims"][selected_char], assets["char_images"][selected_char]
@@ -446,7 +453,9 @@ def run(game):
         scaled = pygame.transform.scale(game_surface, (SCREEN_W, SCREEN_H))
         screen.blit(scaled, (0, 0))
         pygame.display.flip()
-        clock.tick(60)
+        
+        # Capture delta time 
+        dt = clock.tick(60)
 
     pygame.quit()
     sys.exit()

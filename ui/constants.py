@@ -46,3 +46,6 @@ MAP_PROPS = [
     {"type": "box_01", "x": 60, "y": 430}, 
     {"type": "box_02", "x": 350, "y": 600}, 
 ]
+
+#game time per hour
+GAME_MINUTE_MS = 500
