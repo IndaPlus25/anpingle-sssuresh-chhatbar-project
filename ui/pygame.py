@@ -696,17 +696,6 @@ def run(game):
             game_surface.blit(assets["bg"], (0, 0))
 
             # =========================
-            # NEWS BUTTON
-            # =========================
-            draw_button(
-                game_surface,
-                news_btn_rect,
-                "📰 News",
-                assets["small_font"],
-                color=(40, 80, 120)
-            )
-
-            # =========================
             # DESK
             # =========================
             current_desk = assets["desks"].get(
@@ -760,6 +749,14 @@ def run(game):
                 game.stocks,
                 stock_prev_prices
             )
+
+            draw_button(
+            game_surface,
+            news_btn_rect,
+            "📰 News",
+            assets["small_font"],
+            color=(40, 80, 120)
+        )
 
             ticker_offset -= 1.5
             if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
