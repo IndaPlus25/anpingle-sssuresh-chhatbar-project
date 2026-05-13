@@ -3,20 +3,31 @@ import sys
 import random
 
 from .constants import *
-from .screens import (
-    draw_menu,
-    draw_char_select,
-    draw_market_overlay,
-    draw_shop_overlay,
-    draw_confirmation_screen,
-    draw_news_screen,
-    draw_news_detail
+from .screens import draw_menu, draw_char_select, draw_market_overlay, draw_shop_overlay, draw_confirmation_screen, draw_news_screen, draw_news_detail
+from .assets.stock_assets import (
+    CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info
 )
-
+from .assets import stock_assets as pattern_assets
 from features.interaction import mouse_clicked_in_game, draw_button
-from features.hud import draw_top_bar
+from features.hud import draw_top_bar, draw_clock_overlay
 from features.assets import load_all_assets
 from features.player import handle_player_movement, draw_player
+from features.clock import GameClock
+from game.stocks.patterns import PATTERNS as _ALL_PATTERNS
+
+# Candlestick color aliases used by draw_candle / draw_stock_chart
+light_green = CANDLE_COLORS["bullish"]["body"]
+dark_green  = CANDLE_COLORS["bullish"]["border"]
+light_red   = CANDLE_COLORS["bearish"]["body"]
+dark_red    = CANDLE_COLORS["bearish"]["border"]
+
+# General color aliases (lowercase) used throughout chart rendering
+black      = (0, 0, 0)
+gray       = (140, 140, 160)
+light_gray = (240, 240, 240)
+green      = (0, 200, 100)
+red        = (255, 0, 0)
+blue       = (50, 130, 255)
 
 from game.news import *
 
@@ -57,13 +68,7 @@ def draw_candle(screen, x, y, ohlc, height_scale, min_price, max_price):
 
     pygame.draw.line(screen, black, (x, high_y), (x, low_y), 1)
 
-    body_rect = pygame.Rect(
-        x - CANDLE_WIDTH // 2,
-        body_top,
-        CANDLE_WIDTH,
-        max(1, body_height)
-    )
-
+    body_rect = pygame.Rect(x - CANDLE_WIDTH // 2, body_top, CANDLE_WIDTH, max(1, body_height))
     pygame.draw.rect(screen, color, body_rect)
     pygame.draw.rect(screen, border_color, body_rect, 1)
 
@@ -77,7 +82,6 @@ def draw_stock_chart(screen, font, stock, chart_x, chart_y, visible_candles=50):
         return
 
     visible_candles_list = candles[-visible_candles:]
-
     if not visible_candles_list:
         return
 
@@ -105,14 +109,6 @@ def draw_stock_chart(screen, font, stock, chart_x, chart_y, visible_candles=50):
     for i in range(num_grid_lines + 1):
         y_pos = grid_y + (grid_height * i // num_grid_lines)
 
-        pygame.draw.line(
-            screen,
-            gray,
-            (chart_x, y_pos),
-            (chart_x + CHART_WIDTH, y_pos),
-            1
-        )
-
     total_candle_width = CANDLE_WIDTH + CANDLE_SPACING
 
     candle_x = chart_x + CHART_PADDING
@@ -123,13 +119,9 @@ def draw_stock_chart(screen, font, stock, chart_x, chart_y, visible_candles=50):
             break
 
         draw_candle(
-            screen,
-            candle_x,
-            chart_y,
+            screen, candle_x, chart_y,
             (candle.open, candle.high, candle.low, candle.close),
-            height_scale,
-            min_price,
-            max_price
+            height_scale, min_price, max_price
         )
 
         candle_x += total_candle_width
@@ -150,16 +142,11 @@ def draw_stock_chart(screen, font, stock, chart_x, chart_y, visible_candles=50):
 
 
 def draw_pattern_info(screen, font, stock, x, y):
-    """Draw pattern information above the chart."""
-
-    if stock.current_pattern_name is None:
-        return
+    if stock.current_pattern_name is None: return
 
     pattern_name = stock.current_pattern_name
     pattern_info = pattern_assets.get_pattern_info(pattern_name)
-
-    if pattern_info is None:
-        return
+    if pattern_info is None: return
 
     display_name, category, color_category = pattern_info
 
@@ -178,149 +165,56 @@ def draw_pattern_info(screen, font, stock, x, y):
     if stock._active_segment:
 
         remaining_ticks, _ = stock._active_segment
-
-        if hasattr(stock, '_pattern_total_ticks'):
-            total_pattern_ticks = stock._pattern_total_ticks
-        else:
-            total_pattern_ticks = 20
-
+        total_pattern_ticks = getattr(stock, '_pattern_total_ticks', 20)
         queue_ticks = sum(q[0] for q in stock._pattern_queue)
-        active_ticks = remaining_ticks
+        
+        completed = max(0, total_pattern_ticks - (queue_ticks + remaining_ticks))
+        progress_pct = completed / total_pattern_ticks if total_pattern_ticks > 0 else 0
 
-        total_to_complete = total_pattern_ticks
+        bar_width, bar_height = 200, 12
+        bar_x, bar_y = x, y + 45
 
-        completed = total_to_complete - (queue_ticks + active_ticks)
-
-        if completed < 0:
-            completed = 0
-
-        progress_pct = (
-            completed / total_to_complete
-            if total_to_complete > 0 else 0
-        )
-
-        bar_width = 200
-        bar_height = 12
-
-        bar_x = x
-        bar_y = y + 45
-
-        pygame.draw.rect(
-            screen,
-            PATTERN_PROGRESS_BG,
-            (bar_x, bar_y, bar_width, bar_height)
-        )
-
-        pygame.draw.rect(
-            screen,
-            black,
-            (bar_x, bar_y, bar_width, bar_height),
-            1
-        )
-
-        fill_width = int(bar_width * progress_pct)
-
-        pygame.draw.rect(
-            screen,
-            color,
-            (bar_x, bar_y, fill_width, bar_height)
-        )
+        pygame.draw.rect(screen, PATTERN_PROGRESS_BG, (bar_x, bar_y, bar_width, bar_height))
+        pygame.draw.rect(screen, black, (bar_x, bar_y, bar_width, bar_height), 1)
+        pygame.draw.rect(screen, color, (bar_x, bar_y, int(bar_width * progress_pct), bar_height))
 
         num_indicators = min(10, total_pattern_ticks)
         indicator_spacing = bar_width // num_indicators
-
         for i in range(num_indicators):
+            indicator_x = bar_x + (i * indicator_spacing) + indicator_spacing // 2
+            pygame.draw.line(screen, gray, (indicator_x, bar_y - 3), (indicator_x, bar_y + bar_height + 3), 1)
 
-            indicator_x = (
-                bar_x + (i * indicator_spacing) + indicator_spacing // 2
-            )
-
-            pygame.draw.line(
-                screen,
-                gray,
-                (indicator_x, bar_y - 3),
-                (indicator_x, bar_y + bar_height + 3),
-                1
-            )
-
-        pct_text = f"{int(progress_pct * 100)}%"
-
-        pct_surface = font.render(pct_text, True, black)
-
+        pct_surface = font.render(f"{int(progress_pct * 100)}%", True, black)
         screen.blit(pct_surface, (bar_x + bar_width + 10, bar_y))
 
 
 def draw_candle_progress(screen, stock, x, y, candle_width=8, spacing=3):
-    """Draw a summary of the current candle formation progress."""
-
-    if not stock.candles and stock._current_candle is None:
-        return
-
+    if not stock.candles and stock._current_candle is None: return
     current = stock._current_candle
+    if current is None: return
 
-    if current is None:
-        return
+    candle_base_y, candle_base_x = y + 10, x
+    body_height, body_width = 20, candle_width
 
-    candle_base_y = y + 10
-    candle_base_x = x
-
-    body_height = 20
-    body_width = candle_width
-
-    ticks_per_candle = 5
-
-    progress = (
-        min(current.tick / ticks_per_candle, 1.0)
-        if ticks_per_candle > 0 else 1.0
-    )
-
+    ticks_per_candle = 5 
+    progress = min(current.tick / ticks_per_candle, 1.0) if ticks_per_candle > 0 else 1.0
     alpha = int(255 * progress)
 
-    if current.is_bullish():
-        body_color = (0, min(255, 150 + 100 * progress), 0, alpha)
+    if current.is_bullish(): body_color = (0, min(255, 150 + 100 * progress), 0, alpha)
+    elif current.is_bearish(): body_color = (min(255, 200 + 55 * progress), 0, 0, alpha)
+    else: body_color = (128, 128, 128, alpha)
 
-    elif current.is_bearish():
-        body_color = (min(255, 200 + 55 * progress), 0, 0, alpha)
-
-    else:
-        body_color = (128, 128, 128, alpha)
-
-    body_rect = pygame.Rect(
-        candle_base_x,
-        candle_base_y - body_height,
-        body_width,
-        body_height
-    )
-
+    body_rect = pygame.Rect(candle_base_x, candle_base_y - body_height, body_width, body_height)
     pygame.draw.rect(screen, body_color[:3], body_rect)
     pygame.draw.rect(screen, black, body_rect, 1)
 
     if progress < 1.0:
-
-        progress_bar_x = candle_base_x + body_width + 5
-        progress_bar_y = candle_base_y - body_height // 2
-
-        bar_width = 30
-        bar_height = 4
-
-        pygame.draw.rect(
-            screen,
-            PATTERN_PROGRESS_BG,
-            (progress_bar_x, progress_bar_y, bar_width, bar_height)
-        )
-
-        fill_width = int(bar_width * progress)
-
-        pygame.draw.rect(
-            screen,
-            (0, 128, 255),
-            (progress_bar_x, progress_bar_y, fill_width, bar_height)
-        )
+        bar_x, bar_y = candle_base_x + body_width + 5, candle_base_y - body_height // 2
+        pygame.draw.rect(screen, PATTERN_PROGRESS_BG, (bar_x, bar_y, 30, 4))
+        pygame.draw.rect(screen, (0, 128, 255), (bar_x, bar_y, int(30 * progress), 4))
 
 
 def inject_pattern_for_stock(stock, pattern_key):
-    """Inject a pattern into a stock."""
-
     try:
         stock.inject_named_pattern(pattern_key)
         return pattern_key
@@ -330,10 +224,8 @@ def inject_pattern_for_stock(stock, pattern_key):
 
 
 def draw_stock_summary(screen, font, stock, x, y):
-    """Draw stock summary info."""
-
     price_text = f"Price: ${stock.price:.2f}"
-
+    price_color = blue
     if stock.candles:
         last_close = stock.candles[-1].close
         price_color = green if stock.price >= last_close else red
@@ -353,19 +245,8 @@ def draw_stock_summary(screen, font, stock, x, y):
     screen.blit(candle_surface, (x, y + 20))
 
     if stock.current_pattern_name:
-
-        pattern_text = (
-            f"Pattern: "
-            f"{stock.current_pattern_name.replace('_', ' ').title()}"
-        )
-
-        pattern_surface = font.render(
-            pattern_text,
-            True,
-            (0, 100, 200)
-        )
-
-        screen.blit(pattern_surface, (x, y + 40))
+        pattern_text = f"Pattern: {stock.current_pattern_name.replace('_', ' ').title()}"
+        screen.blit(font.render(pattern_text, True, (0, 100, 200)), (x, y + 40))
 
 
 def run(game):
@@ -391,6 +272,9 @@ def run(game):
     clock = pygame.time.Clock()
 
     player = game.players[0]
+    
+    game_clock = GameClock()
+    dt = 16 
 
     state = "menu"
     running = True
@@ -403,12 +287,22 @@ def run(game):
     shop_open = False
 
     buy_buttons = []
-
-    owned_desks = ["desk1"]
+    tab_buttons = []
+    selected_stock_idx = 0
+    market_arrow_left = market_arrow_right = pygame.Rect(0,0,0,0)
+    
+    shop_tab = "Desks"
+    shop_scroll_y = 0
+    owned_items = ["desk1", "wall1"]
+    shop_close_btn = pygame.Rect(0,0,0,0)
 
     confirm_open = False
     pending_item = None
 
+    # Pattern injection tracking
+    pattern_keys = list(_ALL_PATTERNS.keys())
+    PATTERN_INJECT_CHANCE = 0.20  # 20% chance per stock per tick
+    
     last_update = pygame.time.get_ticks()
 
     stock_prev_prices = {
@@ -480,9 +374,10 @@ def run(game):
             ):
                 news.scroll(-event.y * 30)
 
-            # =========================
-            # KEYBOARD
-            # =========================
+            
+            elif event.type == pygame.MOUSEWHEEL and shop_open and not confirm_open:
+                shop_scroll_y += event.y * 30
+            
             elif event.type == pygame.KEYDOWN:
 
                 if (
@@ -539,12 +434,11 @@ def run(game):
                         and market_open
                     ):
                         market_open = False
-
-                    elif (
-                        event.key == pygame.K_TAB
-                        and not confirm_open
-                    ):
-
+                    elif market_open and event.key == pygame.K_LEFT:
+                        selected_stock_idx = (selected_stock_idx - 1) % len(game.stocks)
+                    elif market_open and event.key == pygame.K_RIGHT:
+                        selected_stock_idx = (selected_stock_idx + 1) % len(game.stocks)
+                    elif event.key == pygame.K_TAB and not confirm_open:  
                         shop_open = not shop_open
 
                         market_open = False
@@ -628,20 +522,21 @@ def run(game):
                             if player.cash >= pending_item["price"]:
 
                                 player.cash -= pending_item["price"]
-
-                                owned_desks.append(
-                                    pending_item["id"]
-                                )
-
-                                assets["current_desk_id"] = (
-                                    pending_item["id"]
-                                )
-
+                                owned_items.append(pending_item["id"])
+                                
+                                cat = pending_item.get("category", "Desks")
+                                if cat == "Desks": 
+                                    assets["current_desk_id"] = pending_item["id"]
+                                elif cat == "Walls": 
+                                    assets["current_wall_id"] = pending_item["id"]
+                                    if pending_item["id"] in assets["wall_masks"]:
+                                        assets["walls_mask"] = assets["wall_masks"][pending_item["id"]]
+                                        
                             confirm_open = False
 
                         elif no_btn.collidepoint(gpt):
                             confirm_open = False
-
+                            
                     else:
 
                         # =========================
@@ -653,26 +548,36 @@ def run(game):
 
                             market_open = False
                             shop_open = False
-                            news_open = False
+                            
+                        if market_open:
+                            if market_arrow_left.collidepoint(gpt):
+                                selected_stock_idx = (selected_stock_idx - 1) % len(game.stocks)
+                            elif market_arrow_right.collidepoint(gpt):
+                                selected_stock_idx = (selected_stock_idx + 1) % len(game.stocks)
 
-                        # =========================
-                        # SHOP
-                        # =========================
                         if shop_open:
-
+                            if shop_close_btn.collidepoint(gpt):
+                                shop_open = False
+                            for tab in tab_buttons:
+                                if tab["rect"].collidepoint(gpt):
+                                    shop_tab = tab["category"]
+                                    shop_scroll_y = 0 
+                                    
                             for btn_rect, item, btn_text in buy_buttons:
 
                                 if btn_rect.collidepoint(gpt):
-
-                                    if (
-                                        btn_text == "Buy"
-                                        and player.cash >= item["price"]
-                                    ):
-
+                                    if btn_text == "Buy" and player.cash >= item["price"]:
                                         confirm_open = True
                                         pending_item = item
 
                                     elif btn_text == "Equip":
+                                        cat = item.get("category", "Desks")
+                                        if cat == "Desks": 
+                                            assets["current_desk_id"] = item["id"]
+                                        elif cat == "Walls": 
+                                            assets["current_wall_id"] = item["id"]
+                                            if item["id"] in assets["wall_masks"]:
+                                                assets["walls_mask"] = assets["wall_masks"][item["id"]]
 
                                         assets["current_desk_id"] = (
                                             item["id"]
@@ -699,7 +604,7 @@ def run(game):
                                 if close_btn.collidepoint(gpt):
                                     selected_news_item = None
 
-                            else:
+                            else:                                 
 
                                 if back_btn.collidepoint(gpt):
                                     news_open = False
@@ -808,6 +713,19 @@ def run(game):
                 assets["current_desk_id"]
             )
 
+                # Randomly inject candlestick patterns
+                for stock in game.stocks:
+                    if not stock.is_pattern_active() and random.random() < PATTERN_INJECT_CHANCE:
+                        pattern_key = random.choice(pattern_keys)
+                        stock.inject_named_pattern(pattern_key)
+
+            game_surface.blit(assets["bg"], (0, 0))
+            
+            current_wall_id = assets.get("current_wall_id")
+            if current_wall_id in assets.get("wall_images", {}):
+                game_surface.blit(assets["wall_images"][current_wall_id], (0, 0))
+                
+            current_desk = assets["desks"].get(assets["current_desk_id"])
             if current_desk:
                 game_surface.blit(
                     current_desk,
@@ -843,29 +761,14 @@ def run(game):
             )
 
             ticker_offset -= 1.5
+            if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
+            
+            if not market_open and not shop_open and not confirm_open:
+                anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
+                game_clock.update(dt) 
 
-            if ticker_offset < -(len(game.stocks) * 180):
-                ticker_offset = 0
+            draw_clock_overlay(game_surface, assets["small_font"], assets["hud_font"], game_clock)
 
-            # =========================
-            # PLAYER MOVEMENT
-            # =========================
-            if (
-                not market_open
-                and not shop_open
-                and not confirm_open
-                and not news_open
-            ):
-
-                anim_frame = handle_player_movement(
-                    player,
-                    3.5,
-                    anim_frame
-                )
-
-            # =========================
-            # PLAYER
-            # =========================
             p_rect = draw_player(
                 game_surface,
                 player,
@@ -902,34 +805,21 @@ def run(game):
             # MARKET
             # =========================
             if market_open:
-
-                draw_market_overlay(
-                    game_surface,
-                    assets["body_font"],
-                    assets["hud_font"],
-                    assets["small_font"],
-                    game.stocks
+                market_arrow_left, market_arrow_right = draw_market_overlay(
+                    game_surface, assets["body_font"], assets["hud_font"],
+                    assets["small_font"], game.stocks, selected_stock_idx
                 )
-
-            # =========================
-            # SHOP
-            # =========================
+                
             if shop_open:
-
-                buy_buttons = draw_shop_overlay(
-                    game_surface,
-                    assets["body_font"],
-                    assets["small_font"],
-                    player,
-                    assets["icon_coin"],
-                    assets["desks"],
-                    owned_desks,
-                    assets["current_desk_id"]
+                equipped_items = {
+                    "Desks": assets.get("current_desk_id"),
+                    "Walls": assets.get("current_wall_id")
+                }
+                buy_buttons, tab_buttons, shop_scroll_y, shop_close_btn = draw_shop_overlay(
+                    game_surface, assets["body_font"], assets["small_font"], player, 
+                    assets["icon_coin"], assets.get("shop_thumbnails", {}), owned_items, equipped_items, shop_tab, shop_scroll_y
                 )
-
-            # =========================
-            # CONFIRMATION
-            # =========================
+                                  
             if confirm_open and pending_item:
 
                 yes_btn, no_btn = draw_confirmation_screen(
@@ -974,8 +864,9 @@ def run(game):
         screen.blit(scaled, (0, 0))
 
         pygame.display.flip()
-
-        clock.tick(60)
+        
+        # Capture delta time 
+        dt = clock.tick(60)
 
     pygame.quit()
     sys.exit()
