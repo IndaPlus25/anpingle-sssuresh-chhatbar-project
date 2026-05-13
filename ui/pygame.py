@@ -3,7 +3,7 @@ import sys
 import random
 
 from .constants import *
-from .screens import draw_menu, draw_char_select, draw_market_overlay, draw_shop_overlay, draw_confirmation_screen, draw_news_screen, draw_news_detail
+from .screens import draw_menu, draw_char_select, draw_market_overlay, draw_shop_overlay, draw_confirmation_screen, draw_news_screen, draw_news_detail, draw_staff_panel_overlay
 from .assets.stock_assets import (
     CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info
 )
@@ -14,6 +14,7 @@ from features.assets import load_all_assets
 from features.player import handle_player_movement, draw_player
 from features.clock import GameClock
 from game.stocks.patterns import PATTERNS as _ALL_PATTERNS
+from features.npc import EmployeeNPC
 
 # Candlestick color aliases used by draw_candle / draw_stock_chart
 light_green = CANDLE_COLORS["bullish"]["body"]
@@ -285,7 +286,8 @@ def run(game):
 
     market_open = False
     shop_open = False
-
+    staff_open = False
+    staff_buttons = []
     buy_buttons = []
     tab_buttons = []
     selected_stock_idx = 0
@@ -302,6 +304,10 @@ def run(game):
     # Pattern injection tracking
     pattern_keys = list(_ALL_PATTERNS.keys())
     PATTERN_INJECT_CHANCE = 0.20  # 20% chance per stock per tick
+    
+    # Staff Management
+    active_staff = {} 
+    game_hour_timer = 0
     
     last_update = pygame.time.get_ticks()
 
@@ -358,7 +364,7 @@ def run(game):
     # MAIN LOOP
     # =========================
     while running:
-
+        # ---- EVENT HANDLING ----
         for event in pygame.event.get():
 
             if event.type == pygame.QUIT:
@@ -426,13 +432,8 @@ def run(game):
 
                         else:
                             state = "menu"
-                            market_open = False
-                            shop_open = False
-
-                    elif (
-                        event.key == pygame.K_q
-                        and market_open
-                    ):
+                            market_open = shop_open = staff_open = False
+                    elif event.key == pygame.K_q and market_open: 
                         market_open = False
                     elif market_open and event.key == pygame.K_LEFT:
                         selected_stock_idx = (selected_stock_idx - 1) % len(game.stocks)
@@ -440,8 +441,12 @@ def run(game):
                         selected_stock_idx = (selected_stock_idx + 1) % len(game.stocks)
                     elif event.key == pygame.K_TAB and not confirm_open:  
                         shop_open = not shop_open
+                        market_open = staff_open = False
+                        news_open = False
 
-                        market_open = False
+                    elif event.key == pygame.K_t and not confirm_open: 
+                        staff_open = not staff_open
+                        market_open = shop_open = False
                         news_open = False
 
                     elif (
@@ -449,6 +454,7 @@ def run(game):
                         and not market_open
                         and not shop_open
                         and not news_open
+                        and not staff_open
                     ):
 
                         p_rect = pygame.Rect(
@@ -545,9 +551,7 @@ def run(game):
                         if menu_btn_rect.collidepoint(gpt):
 
                             state = "menu"
-
-                            market_open = False
-                            shop_open = False
+                            market_open = shop_open = staff_open = False
                             
                         if market_open:
                             if market_arrow_left.collidepoint(gpt):
@@ -582,7 +586,19 @@ def run(game):
                                         assets["current_desk_id"] = (
                                             item["id"]
                                         )
+                        if staff_open:
+                            for btn in staff_buttons:
+                                emp_id = btn["id"]
+                                if btn["hire_rect"].collidepoint(gpt) and emp_id not in active_staff:
+                                    # Spawn the employee at a random location
 
+                                    spawn_x = random.randint(200, GAME_W - 200)
+                                    spawn_y = random.randint(200, GAME_H - 200)
+                                    active_staff[emp_id] = EmployeeNPC(spawn_x, spawn_y, btn["config"])
+                                    
+                                elif btn["fire_rect"].collidepoint(gpt) and emp_id in active_staff:
+                                    del active_staff[emp_id]
+                                    
                         # =========================
                         # NEWS BUTTON
                         # =========================
@@ -658,10 +674,8 @@ def run(game):
         # GAME
         # =========================
         elif state == "game":
-
-            # =========================
-            # STOCK UPDATE
-            # =========================
+            
+          
             if pygame.time.get_ticks() - last_update > 1000:
 
                 stock_prev_prices = {
@@ -672,6 +686,13 @@ def run(game):
                 game.update_stocks()
 
                 last_update = pygame.time.get_ticks()
+                
+            
+            game_hour_timer += dt
+            if game_hour_timer >= GAME_HOUR_MS:
+                game_hour_timer -= GAME_HOUR_MS
+                for emp_id, emp_npc in active_staff.items():
+                    player.cash -= emp_npc.config["salary"]
 
             # =========================
             # NEWS GENERATION
@@ -764,9 +785,18 @@ def run(game):
             ticker_offset -= 1.5
             if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
             
-            if not market_open and not shop_open and not confirm_open:
-                anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
-                game_clock.update(dt) 
+            # 
+            if not any([market_open, shop_open, staff_open, confirm_open]):
+                    anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
+                    game_clock.update(dt)
+                    for emp_id, emp_npc in active_staff.items():
+                        emp_npc.update(dt)
+                
+            # 7. Draw Entities
+            for emp_id, emp_npc in active_staff.items():
+                if emp_id in assets["staff_anims"]:
+                    emp_npc.draw(game_surface, assets["staff_anims"][emp_id])
+                    
 
             draw_clock_overlay(game_surface, assets["small_font"], assets["hud_font"], game_clock)
 
@@ -809,6 +839,12 @@ def run(game):
                 market_arrow_left, market_arrow_right = draw_market_overlay(
                     game_surface, assets["body_font"], assets["hud_font"],
                     assets["small_font"], game.stocks, selected_stock_idx
+                )
+                
+            if staff_open:
+                staff_buttons = draw_staff_panel_overlay(
+                    game_surface, assets["body_font"], assets["small_font"], 
+                    active_staff, AVAILABLE_EMPLOYEES, assets["staff_portraits"]
                 )
                 
             if shop_open:
