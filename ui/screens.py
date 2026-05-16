@@ -78,11 +78,13 @@ def draw_char_select(game_surface, title_font, body_font, small_font, selected_i
     
     return card_rects, back_btn, confirm_btn
 
-def draw_text_input(game_surface, rect, text, font, placeholder_font, placeholder="Enter amount..."):
-    """Draws a text input field with the given text."""
+def draw_text_input(game_surface, rect, text, font, placeholder_font, is_active=False, placeholder="Enter amount..."):
+    """Draws a text input field with the given text and optional cursor."""
     # Background
-    pygame.draw.rect(game_surface, (20, 22, 42), rect, border_radius=6)
-    pygame.draw.rect(game_surface, (60, 70, 90), rect, 1, border_radius=6)
+    bg_color = (30, 35, 55) if is_active else (20, 22, 42)
+    border_color = GOLD if is_active else (60, 70, 90)
+    pygame.draw.rect(game_surface, bg_color, rect, border_radius=6)
+    pygame.draw.rect(game_surface, border_color, rect, 2, border_radius=6)
 
     # Text or placeholder
     if text:
@@ -93,6 +95,13 @@ def draw_text_input(game_surface, rect, text, font, placeholder_font, placeholde
     # Center the text
     text_rect = text_surf.get_rect(midleft=(rect.x + 12, rect.centery))
     game_surface.blit(text_surf, text_rect)
+
+    # Draw cursor (blinking line) when active
+    if is_active:
+        cursor_x = text_rect.right + 2
+        cursor_y = rect.y + 8
+        cursor_height = rect.height - 16
+        pygame.draw.line(game_surface, WHITE, (cursor_x, cursor_y), (cursor_x, cursor_y + cursor_height), 2)
 
     return rect
 
@@ -346,22 +355,24 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
     cash_surf = small_font.render(cash_text, True, GOLD)
     game_surface.blit(cash_surf, (left_x + 200, trade_y))
 
-    # Amount input field
-    input_x = left_x + 400
-    input_y = trade_y - 6
-    input_w, input_h = 150, 36
+    # Amount input field - position it to fit within bounds
+    input_x = left_x + 380
+    input_y = pattern_y + 42
+    input_w, input_h = 140, 34
     amount_input_rect = pygame.Rect(input_x, input_y, input_w, input_h)
-    draw_text_input(game_surface, amount_input_rect, amount_text, small_font, small_font)
+    draw_text_input(game_surface, amount_input_rect, amount_text, small_font, small_font, input_active)
 
-    # Buy button
-    buy_btn = pygame.Rect(input_x + input_w + 20, trade_y, 100, 36)
+    # Buy/Sell buttons - aligned to bottom of input box
+    btn_w, btn_h = 90, 32
+    btn_y = input_y + input_h - btn_h  # Align bottom with input box
+
+    buy_btn = pygame.Rect(input_x + input_w + 12, btn_y, btn_w, btn_h)
     buy_color = (30, 140, 80)  # Green
     if player_cash < stock.price or not amount_text:
         buy_color = (60, 80, 60)  # Dimmed green if can't afford
     draw_button(game_surface, buy_btn, "BUY", small_font, color=buy_color, radius=6)
 
-    # Sell button
-    sell_btn = pygame.Rect(buy_btn.right + 15, trade_y, 100, 36)
+    sell_btn = pygame.Rect(buy_btn.right + 10, btn_y, btn_w, btn_h)
     sell_color = (180, 60, 60)  # Red
     if owned_qty <= 0 or not amount_text:
         sell_color = (80, 60, 60)  # Dimmed red if can't sell

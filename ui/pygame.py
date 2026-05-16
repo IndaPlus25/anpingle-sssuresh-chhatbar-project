@@ -294,6 +294,7 @@ def run(game):
     market_arrow_left = market_arrow_right = pygame.Rect(0,0,0,0)
     market_buy_btn = market_sell_btn = market_amount_input = pygame.Rect(0,0,0,0)
     market_amount_text = ""
+    market_input_active = False
     
     shop_tab = "Desks"
     shop_scroll_y = 0
@@ -569,6 +570,12 @@ def run(game):
                                 selected_stock_idx = (selected_stock_idx - 1) % len(game.stocks)
                             elif market_arrow_right.collidepoint(gpt):
                                 selected_stock_idx = (selected_stock_idx + 1) % len(game.stocks)
+
+                            # Amount input field - toggle active state
+                            if market_amount_input.collidepoint(gpt):
+                                market_input_active = True
+                            else:
+                                market_input_active = False
 
                             # Buy/Sell buttons
                             current_stock = game.stocks[selected_stock_idx]
@@ -875,7 +882,7 @@ def run(game):
                 market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input = draw_market_overlay(
                     game_surface, assets["body_font"], assets["hud_font"],
                     assets["small_font"], game.stocks, selected_stock_idx,
-                    player.cash, player.portfolio, market_amount_text
+                    player.cash, player.portfolio, market_amount_text, market_input_active
                 )
                 
             if staff_open:
