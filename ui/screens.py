@@ -78,11 +78,32 @@ def draw_char_select(game_surface, title_font, body_font, small_font, selected_i
     
     return card_rects, back_btn, confirm_btn
 
+def draw_text_input(game_surface, rect, text, font, placeholder_font, placeholder="Enter amount..."):
+    """Draws a text input field with the given text."""
+    # Background
+    pygame.draw.rect(game_surface, (20, 22, 42), rect, border_radius=6)
+    pygame.draw.rect(game_surface, (60, 70, 90), rect, 1, border_radius=6)
+
+    # Text or placeholder
+    if text:
+        text_surf = font.render(text, True, WHITE)
+    else:
+        text_surf = placeholder_font.render(placeholder, True, (100, 100, 120))
+
+    # Center the text
+    text_rect = text_surf.get_rect(midleft=(rect.x + 12, rect.centery))
+    game_surface.blit(text_surf, text_rect)
+
+    return rect
+
+
+# TEST
 def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
-                         selected_stock_idx=0):
+                         selected_stock_idx=0, player_cash=0, player_portfolio=None,
+                         amount_text="", input_active=False):
     """Draws the Stock Market interaction menu with candlestick charts and pattern info.
 
-    Returns (left_arrow_rect, right_arrow_rect) for click-based stock navigation.
+    Returns (left_arrow_rect, right_arrow_rect, buy_btn, sell_btn, amount_input_rect) for click-based stock navigation and trading.
     """
     from .constants import BLUE, GOLD, GREEN, GRAY, RED, WHITE, DARK
     from .assets.stock_assets import (
@@ -308,6 +329,45 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
         game_surface.blit(idle_surf, (left_x, pattern_y + 4))
 
     # ----------------------------------------------------------------
+    # Trading panel (buy/sell)
+    # ----------------------------------------------------------------
+    trade_y = pattern_y + 50
+
+    # Portfolio info
+    owned_qty = 0
+    if player_portfolio and stock.name in player_portfolio:
+        owned_qty = player_portfolio[stock.name]
+
+    portfolio_text = f"Owned: {owned_qty} shares"
+    portfolio_surf = small_font.render(portfolio_text, True, (180, 180, 200))
+    game_surface.blit(portfolio_surf, (left_x, trade_y))
+
+    cash_text = f"Cash: ${player_cash:,.0f}"
+    cash_surf = small_font.render(cash_text, True, GOLD)
+    game_surface.blit(cash_surf, (left_x + 200, trade_y))
+
+    # Amount input field
+    input_x = left_x + 400
+    input_y = trade_y - 6
+    input_w, input_h = 150, 36
+    amount_input_rect = pygame.Rect(input_x, input_y, input_w, input_h)
+    draw_text_input(game_surface, amount_input_rect, amount_text, small_font, small_font)
+
+    # Buy button
+    buy_btn = pygame.Rect(input_x + input_w + 20, trade_y, 100, 36)
+    buy_color = (30, 140, 80)  # Green
+    if player_cash < stock.price or not amount_text:
+        buy_color = (60, 80, 60)  # Dimmed green if can't afford
+    draw_button(game_surface, buy_btn, "BUY", small_font, color=buy_color, radius=6)
+
+    # Sell button
+    sell_btn = pygame.Rect(buy_btn.right + 15, trade_y, 100, 36)
+    sell_color = (180, 60, 60)  # Red
+    if owned_qty <= 0 or not amount_text:
+        sell_color = (80, 60, 60)  # Dimmed red if can't sell
+    draw_button(game_surface, sell_btn, "SELL", small_font, color=sell_color, radius=6)
+
+    # ----------------------------------------------------------------
     # Stock ticker strip at the bottom
     # ----------------------------------------------------------------
     ticker_y = box.y + BOX_H - 36
@@ -322,7 +382,7 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
         game_surface.blit(ticker_label, (tx, ticker_y))
         tx += ticker_label.get_width() + 20
 
-    return left_arrow_rect, right_arrow_rect
+    return left_arrow_rect, right_arrow_rect, buy_btn, sell_btn, amount_input_rect
 
 def draw_shop_overlay(game_surface, body_font, small_font, player, icon_coin, thumbnails, owned_items, equipped_items, shop_tab, scroll_y):
     """Draws the shop overlay."""
