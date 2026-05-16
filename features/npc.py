@@ -24,6 +24,19 @@ class EmployeeNPC:
         self.target_x = x
         self.target_y = y
 
+        self.role = "Salesman"
+
+    def _pick_target(self):
+        if getattr(self, 'role', 'Salesman') == "Accountant":
+            new_x = self.x + random.randint(-150, 150)
+            new_y = self.y + random.randint(-150, 150)
+            # Make sure they don't walk off the screen
+            self.target_x = max(100, min(GAME_W - 100, new_x))
+            self.target_y = max(100, min(GAME_H - 100, new_y))
+        else:
+            self.target_x = random.randint(100, GAME_W - 100)
+            self.target_y = random.randint(100, GAME_H - 100)
+
     def update(self, dt, assets):
         game_minutes_passed = dt / GAME_MINUTE_MS 
 
@@ -41,9 +54,8 @@ class EmployeeNPC:
             self.anim_frame = 0
             if self.timer_minutes <= 0:
                 self.state = "walk"
-                self.target_x = random.randint(100, GAME_W - 100)
-                self.target_y = random.randint(100, GAME_H - 100)
-                
+                self._pick_target() 
+
         elif self.state == "walk":
             # Drain 1 energy per in-game minute
             self.energy -= 2.0 * game_minutes_passed 
@@ -60,8 +72,14 @@ class EmployeeNPC:
                 self.state = "idle"
                 self.timer_minutes = random.uniform(10.0, 30.0) # Idle for 10-30 game minutes
             else:
-                move_x = (dx / dist) * self.speed
-                move_y = (dy / dist) * self.speed
+                if getattr(self, 'role', 'Salesman') == "Accountant":
+                    current_speed = self.speed * 0.5  # Accountants walk slower
+                else:
+                    current_speed = self.speed * 1.2  # Salesmen hustle fast
+                
+                # Use current_speed for math
+                move_x = (dx / dist) * current_speed
+                move_y = (dy / dist) * current_speed
                 
                 old_x = self.x
                 old_y = self.y
@@ -77,8 +95,7 @@ class EmployeeNPC:
 
                 # Bump Detection
                 if abs(self.x - old_x) < 0.5 and abs(self.y - old_y) < 0.5:
-                    self.target_x = random.randint(100, GAME_W - 100)
-                    self.target_y = random.randint(100, GAME_H - 100)
+                    self._pick_target() # Pick a new target based on role
                     self.state = "idle" 
                     self.timer_minutes = 5.0 # Pause for 5 game minutes when bumping into a wall
 
@@ -90,14 +107,22 @@ class EmployeeNPC:
                 elif move_x > 0.5: dir_str += "east"
                 
                 if dir_str: self.direction = dir_str
-                self.anim_frame = (self.anim_frame + 0.1) % 6
+                
+                if getattr(self, 'role', 'Salesman') == "Accountant":
+                    self.anim_frame = (self.anim_frame + 0.05) % 6 # Play animation slow
+                else:
+                    self.anim_frame = (self.anim_frame + 0.15) % 6 # Play animation fast
 
     def draw(self, surface, anims, small_font):
         rect = pygame.Rect(self.x, self.y, 92, 92) 
         d = self.direction
         
         if self.state == "walk" and anims["walk"].get(d):
-            img = anims["walk"][d][int(self.anim_frame)]
+            if len(anims["walk"][d]) > 0:
+                safe_idx = int(self.anim_frame) % len(anims["walk"][d])
+                img = anims["walk"][d][safe_idx]
+            else:
+                img = None
         else:
             img = anims["idle"].get(d)
             

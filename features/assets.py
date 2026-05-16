@@ -94,12 +94,18 @@ def load_all_assets():
         try: char_images.append(pygame.image.load(c["file"]).convert_alpha())
         except: char_images.append(None)
     assets["char_images"] = char_images
-
+    # characters
     assets["all_char_anims"] = [
         load_8way_animations("ui/characters/char1"),
         load_8way_animations("ui/characters/char2"),
         load_8way_animations("ui/characters/char3")
     ]
+    #IRS
+    try:
+        assets["irs_anims"] = load_json_animations("ui/characters/IRS")
+    except Exception as e:
+        print(f"Warning: Could not load IRS animations: {e}")
+        assets["irs_anims"] = None
 
     assets["staff_anims"] = {}
     assets["staff_portraits"] = {}
