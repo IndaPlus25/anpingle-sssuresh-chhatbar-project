@@ -3,7 +3,7 @@ import sys
 import random
 
 from .constants import *
-from .screens import draw_menu, draw_char_select, draw_market_overlay, draw_shop_overlay, draw_confirmation_screen, draw_news_screen, draw_news_detail, draw_staff_panel_overlay, draw_accounts_screen
+from .screens import draw_menu, draw_char_select, draw_market_overlay, draw_shop_overlay, draw_confirmation_screen, draw_news_screen, draw_news_detail, draw_staff_panel_overlay, draw_accounts_screen, draw_interaction_prompt
 from .assets.stock_assets import (
     CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info
 )
@@ -931,28 +931,35 @@ def run(game):
             # =========================
             # INTERACTION TEXT
             # =========================
-            if (
-                p_rect.colliderect(
-                    assets["computer_rect"].inflate(100, 100)
-                )
-                and not market_open
-                and not shop_open
-                and not accounts_open
-                and not news_open
-                and not audit_active # Hide interact prompt during audit
-            ):
-
-                game_surface.blit(
-                    assets["hud_font"].render(
-                        "Press E to interact",
-                        True,
-                        GREEN
-                    ),
-                    (
-                        assets["computer_rect"].x - 20,
-                        assets["computer_rect"].y - 60
-                    )
-                )
+            if not any([market_open, shop_open, accounts_open, news_open, staff_open]):
+                
+                # Check if player is near the computer desk
+                if p_rect.colliderect(assets["computer_rect"].inflate(100, 100)):
+                    
+                    # Position the prompt perfectly centered above the computer
+                    prompt_x = assets["computer_rect"].centerx
+                    prompt_y = assets["computer_rect"].top - 10
+                    
+                    if audit_active and irs_agent.state == "approaching" and player.owed_taxes > 0:
+                        # IRS Audit mode: Red border, telling them to panic!
+                        draw_interaction_prompt(
+                            game_surface, 
+                            assets["small_font"], 
+                            "Hold SPACE to transfer money", 
+                            prompt_x, 
+                            prompt_y,
+                            border_color=(255, 100, 100) # Red border for urgency
+                        )
+                    elif not audit_active:
+                        # Normal mode: Green border
+                        draw_interaction_prompt(
+                            game_surface, 
+                            assets["small_font"], 
+                            "Press E to Trade", 
+                            prompt_x, 
+                            prompt_y,
+                            border_color=(80, 200, 120) # Green border
+                        )
 
             # =========================
             # IRS EVENT DRAWING & RESOLUTION

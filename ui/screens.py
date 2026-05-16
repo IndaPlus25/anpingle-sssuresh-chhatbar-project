@@ -982,3 +982,29 @@ def draw_accounts_screen(game_surface, title_font, body_font, small_font, player
     game_surface.blit(small_font.render(f"${player.owed_taxes:,.2f}", True, RED), (tax_rect.x + 20, tax_rect.y + 45))
 
     return close_btn, repat_btn
+
+def draw_interaction_prompt(surface, font, text, center_x, bottom_y, border_color=(80, 200, 120)):
+    """Draws a dynamic, centered interaction prompt box."""
+    import pygame
+    
+    # Render text first to get its exact dimensions
+    text_surf = font.render(text, True, (255, 255, 255))
+    text_w, text_h = text_surf.get_size()
+    
+    # Calculate box dimensions with padding
+    padding_x = 15
+    padding_y = 6
+    box_w = text_w + (padding_x * 2)
+    box_h = text_h + (padding_y * 2)
+    
+    # Position the box (centered horizontally, anchored at the bottom)
+    box_x = center_x - (box_w // 2)
+    box_y = bottom_y - box_h
+    box_rect = pygame.Rect(box_x, box_y, box_w, box_h)
+    
+    # Draw dark background and dynamic border
+    pygame.draw.rect(surface, (30, 34, 45), box_rect, border_radius=6)
+    pygame.draw.rect(surface, border_color, box_rect, 2, border_radius=6)
+    
+    # Draw text exactly in the center of the box
+    surface.blit(text_surf, (box_x + padding_x, box_y + padding_y))
