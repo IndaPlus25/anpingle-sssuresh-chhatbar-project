@@ -3,7 +3,7 @@ import sys
 import random
 
 from .constants import *
-from .screens import draw_menu, draw_char_select, draw_market_overlay, draw_shop_overlay, draw_confirmation_screen, draw_news_screen, draw_news_detail, draw_staff_panel_overlay
+from .screens import draw_menu, draw_char_select, draw_market_overlay, draw_shop_overlay, draw_confirmation_screen, draw_news_screen, draw_news_detail, draw_staff_panel_overlay, draw_accounts_screen, draw_interaction_prompt
 from .assets.stock_assets import (
     CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info
 )
@@ -15,6 +15,9 @@ from features.player import handle_player_movement, draw_player
 from features.clock import GameClock
 from game.stocks.patterns import PATTERNS as _ALL_PATTERNS
 from features.npc import EmployeeNPC
+
+# --- IMPORT OUR NEW IRS SYSTEM ---
+from features.irs import IRSAgent, draw_audit_warning
 
 # Candlestick color aliases used by draw_candle / draw_stock_chart
 light_green = CANDLE_COLORS["bullish"]["body"]
@@ -274,6 +277,15 @@ def run(game):
 
     player = game.players[0]
     
+    # --- SETUP IRS PLAYER VARIABLES ---
+    player.offshore = 0
+    player.owed_taxes = 0
+    audit_active = False
+    irs_agent = None
+    wiring_funds = False
+    post_audit_message = ""
+    post_audit_timer = 0
+    
     game_clock = GameClock()
     dt = 16 
 
@@ -325,6 +337,12 @@ def run(game):
     news_open = False
     selected_news_item = None
 
+    accounts_open = False
+    accounts_close_btn = pygame.Rect(0,0,0,0)
+    audit_active = False
+    irs_agent = None
+    hours_until_audit = 168
+
     last_news_time = pygame.time.get_ticks()
 
     news_interval = random.randint(5000, 15000)
@@ -365,6 +383,10 @@ def run(game):
     # MAIN LOOP
     # =========================
     while running:
+        
+        # --- NEW: Get live keys for the Spacebar mechanic ---
+        keys_pressed = pygame.key.get_pressed()
+        
         # ---- EVENT HANDLING ----
         for event in pygame.event.get():
 
@@ -386,6 +408,20 @@ def run(game):
                 shop_scroll_y += event.y * 30
             
             elif event.type == pygame.KEYDOWN:
+
+                # =========================
+                # IRS TEST TRIGGER (F12)
+                # =========================
+                if event.key == pygame.K_F12 and state == "game" and not audit_active:
+                    audit_active = True
+                    post_audit_message = ""
+                    accountants = sum(1 for e in active_staff.values() if getattr(e, 'role', 'Salesman') == "Accountant" and emp_npc.energy > 0)
+                    tax_rate = max(0.15 - (0.02 * accountants), 0.05)
+                    player.owed_taxes = player.cash * tax_rate
+                    # Spawn at bottom center, target the computer desk!
+                    desk_x = assets["computer_rect"].x
+                    desk_y = assets["computer_rect"].y
+                    irs_agent = IRSAgent(GAME_W // 2, GAME_H + 50, desk_x, desk_y + 80)
 
                 if (
                     event.key in (pygame.K_q, pygame.K_ESCAPE)
@@ -431,6 +467,9 @@ def run(game):
                         elif news_open:
                             news_open = False
 
+                        elif accounts_open:
+                            accounts_open = False
+
                         else:
                             state = "menu"
                             market_open = shop_open = staff_open = False
@@ -444,11 +483,18 @@ def run(game):
                         shop_open = not shop_open
                         market_open = staff_open = False
                         news_open = False
+                        accounts_open = False
 
                     elif event.key == pygame.K_t and not confirm_open: 
                         staff_open = not staff_open
                         market_open = shop_open = False
                         news_open = False
+                        accounts_open = False
+
+                    elif event.key == pygame.K_b and not confirm_open:
+                        accounts_open = not accounts_open
+                        if accounts_open:
+                            market_open = shop_open = staff_open = news_open = False
 
                     elif (
                         event.key == pygame.K_e
@@ -456,6 +502,7 @@ def run(game):
                         and not shop_open
                         and not news_open
                         and not staff_open
+                        and not accounts_open
                     ):
 
                         p_rect = pygame.Rect(
@@ -482,6 +529,7 @@ def run(game):
                         if news_open:
                             market_open = False
                             shop_open = False
+                            accounts_open = False
 
             # =========================
             # MOUSE CLICK
@@ -587,6 +635,16 @@ def run(game):
                                         assets["current_desk_id"] = (
                                             item["id"]
                                         )
+                        if accounts_open:
+                            if accounts_close_btn.collidepoint(gpt):
+                                accounts_open = False
+                            elif repatriate_btn.collidepoint(gpt) and player.offshore > 0:
+                                # The IRS takes a 10% repatriation penalty
+                                penalty = player.offshore * 0.10
+                                
+                                # Move the remaining 90% back to liquid cash
+                                player.cash += (player.offshore - penalty)
+                                player.offshore = 0
                         if staff_open:
                             if staff_close_btn.collidepoint(gpt):
                                 staff_open = False
@@ -602,6 +660,21 @@ def run(game):
                                 elif btn["fire_rect"].collidepoint(gpt) and emp_id in active_staff:
                                     del active_staff[emp_id]
                                     
+                                elif "role_rect" in btn and btn["role_rect"].collidepoint(gpt) and emp_id in active_staff:
+                                    npc = active_staff[emp_id]
+                                    
+                                    if npc.role == "Salesman":
+                                        # Count current accountants
+                                        current_accountants = sum(1 for e in active_staff.values() if getattr(e, 'role', 'Salesman') == "Accountant")
+                                        
+                                        # Only allow changing to Accountant if we have less than 3
+                                        if current_accountants < 3:
+                                            npc.role = "Accountant"
+                                        else:
+                                            print("Maximum of 3 Accountants reached!")
+                                    else:
+                                        npc.role = "Salesman"
+                                    
                         # =========================
                         # NEWS BUTTON
                         # =========================
@@ -612,6 +685,7 @@ def run(game):
                             if news_open:
                                 shop_open = False
                                 market_open = False
+                                accounts_open = False
 
                         # =========================
                         # NEWS SCREEN
@@ -738,8 +812,6 @@ def run(game):
                 if not stock.is_pattern_active() and random.random() < PATTERN_INJECT_CHANCE:
                     pattern_key = random.choice(pattern_keys)
                     stock.inject_named_pattern(pattern_key)
-
-            game_surface.blit(assets["bg"], (0, 0))
             
             current_wall_id = assets.get("current_wall_id")
             if current_wall_id in assets.get("wall_images", {}):
@@ -765,6 +837,26 @@ def run(game):
                         prop_img,
                         (prop["x"], prop["y"])
                     )
+            
+            # =========================
+            # IRS WIRING LOGIC
+            # =========================
+            p_rect = pygame.Rect(player.x, player.y, 64, 64)
+            wiring_funds = False
+            
+            if audit_active and irs_agent.state == "approaching":
+                # Check if player is near desk AND holding Space
+                if p_rect.colliderect(assets["computer_rect"].inflate(100, 100)):
+                    if keys_pressed[pygame.K_SPACE]:
+                        wiring_funds = True
+                        transfer_rate = 20000000 * (dt / 1000) # Transfer $20M per second
+                        if player.cash >= transfer_rate:
+                            player.cash -= transfer_rate
+                            player.offshore += transfer_rate
+                        else:
+                            player.offshore += player.cash
+                            player.cash = 0
+
 
             # =========================
             # TOP BAR
@@ -784,8 +876,8 @@ def run(game):
             ticker_offset -= 1.5
             if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
             
-            # 
-            if not any([market_open, shop_open, staff_open, confirm_open]):
+            # --- UPDATED: Block physics if wiring funds! ---
+            if not any([market_open, shop_open, staff_open, accounts_open, confirm_open, wiring_funds]):
                     anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
                     game_clock.update(dt)
                     game_hour_timer += dt
@@ -797,8 +889,25 @@ def run(game):
                             salary = emp_npc.config["salary"]
                             player.cash -= salary
                             total_salary_paid += salary
-                            
+                            if getattr(emp_npc, 'role', 'Salesman') == "Salesman" and emp_npc.energy > 0:
+                                player.cash += (salary * 2.0)
 
+                        hours_until_audit -= 1
+                        if hours_until_audit <= 0 and not audit_active:
+                            audit_active = True
+                            post_audit_message = ""
+                            
+                            accountants = sum(1 for e in active_staff.values() if getattr(e, 'role', 'Salesman') == "Accountant" and emp_npc.energy > 0)
+                    
+                            tax_rate = max(0.15 - (0.02 * accountants), 0.05)
+                            player.owed_taxes = player.cash * tax_rate
+                            
+                            desk_x = assets["computer_rect"].x
+                            desk_y = assets["computer_rect"].y
+                            irs_agent = IRSAgent(GAME_W // 2, GAME_H + 50, desk_x, desk_y + 80)
+                            
+                            # Reset the timer for next week
+                            hours_until_audit = 168
 
                     for emp_id, emp_npc in active_staff.items():
                         emp_npc.update(dt, assets)
@@ -822,29 +931,84 @@ def run(game):
             # =========================
             # INTERACTION TEXT
             # =========================
-            if (
-                p_rect.colliderect(
-                    assets["computer_rect"].inflate(100, 100)
-                )
-                and not market_open
-                and not shop_open
-                and not news_open
-            ):
-
-                game_surface.blit(
-                    assets["hud_font"].render(
-                        "Press E to interact",
-                        True,
-                        GREEN
-                    ),
-                    (
-                        assets["computer_rect"].x - 20,
-                        assets["computer_rect"].y - 60
-                    )
-                )
+            if not any([market_open, shop_open, accounts_open, news_open, staff_open]):
+                
+                # Check if player is near the computer desk
+                if p_rect.colliderect(assets["computer_rect"].inflate(100, 100)):
+                    
+                    # Position the prompt perfectly centered above the computer
+                    prompt_x = assets["computer_rect"].centerx
+                    prompt_y = assets["computer_rect"].top - 10
+                    
+                    if audit_active and irs_agent.state == "approaching" and player.owed_taxes > 0:
+                        # IRS Audit mode: Red border, telling them to panic!
+                        draw_interaction_prompt(
+                            game_surface, 
+                            assets["small_font"], 
+                            "Hold SPACE to transfer money", 
+                            prompt_x, 
+                            prompt_y,
+                            border_color=(255, 100, 100) # Red border for urgency
+                        )
+                    elif not audit_active:
+                        # Normal mode: Green border
+                        draw_interaction_prompt(
+                            game_surface, 
+                            assets["small_font"], 
+                            "Press E to Trade", 
+                            prompt_x, 
+                            prompt_y,
+                            border_color=(80, 200, 120) # Green border
+                        )
 
             # =========================
-            # MARKET
+            # IRS EVENT DRAWING & RESOLUTION
+            # =========================
+            if audit_active:
+                draw_audit_warning(game_surface, assets["hud_font"], player.owed_taxes, GAME_W)
+                
+                if wiring_funds:
+                    wire_bar = pygame.Rect(player.x - 40, player.y - 30, 140, 20)
+                    pygame.draw.rect(game_surface, (40, 40, 40), wire_bar, border_radius=4)
+                    pygame.draw.rect(game_surface, (0, 200, 100), (wire_bar.x, wire_bar.y, 140, 20), border_radius=4)
+                    wire_txt = assets["small_font"].render(f"WIRING...", True, (255,255,255))
+                    game_surface.blit(wire_txt, (wire_bar.x + 10, wire_bar.y - 25))
+
+                reached_desk = irs_agent.update(dt, assets)
+                irs_agent.draw(game_surface, assets["small_font"], assets.get("irs_anims"))
+                
+                if reached_desk:
+                    if keys_pressed[pygame.K_SPACE]:
+                        # CAUGHT! 250% SEC FINE
+                        sec_fine = player.owed_taxes * 2.5
+                        post_audit_message = f"CAUGHT WIRING! SEC FINE: ${sec_fine/1000000:.1f}M!"
+                        irs_agent.speech_text = "Fraud detected. Issuing 250% SEC fine."
+                        player.cash -= sec_fine
+                        player.offshore = 0 # They also seize the offshore attempt
+                    else:
+                        # SAFE!
+                        post_audit_message = f"IRS TOOK ${player.owed_taxes/1000000:.1f}M. OFFSHORE SAFE."
+                        irs_agent.speech_text = f"Collected taxes. Have a nice day."
+                        player.cash -= player.owed_taxes
+                        
+                    player.owed_taxes = 0
+                    irs_agent.state = "leaving"
+                    post_audit_timer = 4000
+                    audit_active = False
+
+            if post_audit_timer > 0:
+                post_audit_timer -= dt
+                msg_rect = pygame.Rect(GAME_W//2 - 300, GAME_H//2 - 50, 600, 100)
+                pygame.draw.rect(game_surface, (20, 20, 20), msg_rect, border_radius=10)
+                pygame.draw.rect(game_surface, (255, 215, 0), msg_rect, 3, border_radius=10)
+                msg_surf = assets["hud_font"].render(post_audit_message, True, (255, 215, 0))
+                game_surface.blit(msg_surf, msg_surf.get_rect(center=msg_rect.center))
+                irs_agent.update(dt, assets) 
+                irs_agent.draw(game_surface, assets["small_font"], assets.get("irs_anims"))
+
+
+            # =========================
+            # UI OVERLAYS
             # =========================
             if market_open:
                 market_arrow_left, market_arrow_right = draw_market_overlay(
@@ -867,9 +1031,14 @@ def run(game):
                     game_surface, assets["body_font"], assets["small_font"], player, 
                     assets["icon_coin"], assets.get("shop_thumbnails", {}), owned_items, equipped_items, shop_tab, shop_scroll_y
                 )
+            
+
+            if accounts_open:
+                accounts_close_btn, repatriate_btn = draw_accounts_screen(
+                    game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player
+                )
                                   
             if confirm_open and pending_item:
-
                 yes_btn, no_btn = draw_confirmation_screen(
                     game_surface,
                     assets["body_font"],
@@ -881,7 +1050,6 @@ def run(game):
             # NEWS SCREEN
             # =========================
             if news_open:
-
                 back_btn, card_rects = draw_news_screen(
                     game_surface,
                     assets["title_font"],
@@ -892,7 +1060,6 @@ def run(game):
                 )
 
                 if selected_news_item:
-
                     close_btn = draw_news_detail(
                         game_surface,
                         assets["title_font"],
