@@ -34,6 +34,11 @@ SHOP_ITEMS = [
     {"id": "wall3", "name": "Refurbished Steel",  "price": 100000, "file": "ui/backgrounds/walls/walls_03.png","category": "Walls"},
     {"id": "wall4", "name": "Modern Corporate",  "price": 500000, "file": "ui/backgrounds/walls/walls_04.png","category": "Walls"},
     {"id": "wall5", "name": "Cyber Grid",  "price": 1000000, "file": "ui/backgrounds/walls/walls_05.png","category": "Walls"},
+    {"id": "plant1", "name": "Empty pot ",  "price": 1500, "file": "ui/assets/pot_01.png", "category": "Plants", "placeable": True},
+    {"id": "plant2", "name": "Small Fern",     "price": 2000, "file": "ui/assets/pot_02.png", "category": "Plants", "placeable": True},
+    {"id": "plant3", "name": "Small Tree",   "price": 4500, "file": "ui/assets/pot_03.png", "category": "Plants", "placeable": True},
+    {"id": "plant4", "name": "Monstera",      "price": 3000, "file": "ui/assets/pot_04.png", "category": "Plants", "placeable": True},
+    {"id": "plant5", "name": "Bush","price": 1000000, "file": "ui/assets/pot_05.png", "category": "Plants", "placeable": True},
 ]
 
 # map assets

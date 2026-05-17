@@ -35,7 +35,7 @@ def handle_player_movement(player, speed, anim_frame, assets):
         dy *= 0.7071
     player.is_moving = is_moving
     if is_moving:
-        move_with_collision(player, dx, dy, assets["walls_mask"], assets["feet_mask"], props_collision=assets["props_collision"],char_width=64, char_height=64, custom_offset_x=30, custom_offset_y=65)
+        move_with_collision(player, dx, dy, assets["walls_mask"], assets["feet_mask"], props_collision=assets["props_collision"],char_width=64, char_height=64, custom_offset_x=30, custom_offset_y=65,placed_props=assets.get("placed_props", []), placed_masks=assets.get("placeable_full_masks", {}))
         anim_frame = (anim_frame + 0.15) % 6
     else:
         anim_frame = 0
