@@ -15,8 +15,7 @@ from features.player import handle_player_movement, draw_player
 from features.clock import GameClock
 from game.stocks.patterns import PATTERNS as _ALL_PATTERNS
 from features.npc import EmployeeNPC
-
-# --- IMPORT OUR NEW IRS SYSTEM ---
+from features.placement import check_placement_valid, draw_placement_preview
 from features.irs import IRSAgent, draw_audit_warning
 
 # Candlestick color aliases used by draw_candle / draw_stock_chart
@@ -342,7 +341,10 @@ def run(game):
     audit_active = False
     irs_agent = None
     hours_until_audit = 168
-
+    placement_mode = False
+    placement_item_id = None
+    placement_x, placement_y = 0, 0
+    placed_props = []
     last_news_time = pygame.time.get_ticks()
 
     news_interval = random.randint(5000, 15000)
@@ -387,6 +389,16 @@ def run(game):
         # --- NEW: Get live keys for the Spacebar mechanic ---
         keys_pressed = pygame.key.get_pressed()
         
+        if state == "game" and placement_mode:
+            place_speed = 6
+            if keys_pressed[pygame.K_LEFT] or keys_pressed[pygame.K_a]: placement_x -= place_speed
+            if keys_pressed[pygame.K_RIGHT] or keys_pressed[pygame.K_d]: placement_x += place_speed
+            if keys_pressed[pygame.K_UP] or keys_pressed[pygame.K_w]: placement_y -= place_speed
+            if keys_pressed[pygame.K_DOWN] or keys_pressed[pygame.K_s]: placement_y += place_speed
+            
+            # Keep it on screen
+            placement_x = max(0, min(GAME_W - 50, placement_x))
+            placement_y = max(0, min(GAME_H - 50, placement_y))
         # ---- EVENT HANDLING ----
         for event in pygame.event.get():
 
@@ -457,7 +469,8 @@ def run(game):
                 elif state == "game":
 
                     if event.key == pygame.K_ESCAPE:
-
+                        if placement_mode:
+                            placement_mode = False
                         if confirm_open:
                             confirm_open = False
 
@@ -473,6 +486,19 @@ def run(game):
                         else:
                             state = "menu"
                             market_open = shop_open = staff_open = False
+                    elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and placement_mode:
+                        is_valid = check_placement_valid(placement_x, placement_y, placement_item_id, assets, placed_props)
+                        
+                        if is_valid:
+                            # 1. Put it on the map
+                            placed_props.append({"id": placement_item_id, "x": placement_x, "y": placement_y})
+                            
+                            # 2. Consume exactly 1 from the inventory!
+                            if placement_item_id in owned_items:
+                                owned_items.remove(placement_item_id)
+                                
+                            # 3. Exit placement mode
+                            placement_mode = False
                     elif event.key == pygame.K_q and market_open: 
                         market_open = False
                     elif market_open and event.key == pygame.K_LEFT:
@@ -635,6 +661,11 @@ def run(game):
                                         assets["current_desk_id"] = (
                                             item["id"]
                                         )
+                                    elif btn_text == "Place":
+                                        placement_mode = True
+                                        placement_item_id = item["id"]
+                                        placement_x, placement_y = player.x, player.y
+                                        shop_open = False
                         if accounts_open:
                             if accounts_close_btn.collidepoint(gpt):
                                 accounts_open = False
@@ -837,7 +868,24 @@ def run(game):
                         prop_img,
                         (prop["x"], prop["y"])
                     )
-            
+            for p in placed_props:
+                p_img = assets.get("placeables", {}).get(p["id"])
+                if p_img:
+                    game_surface.blit(p_img, (p["x"], p["y"]))
+                    
+            if placement_mode:
+                is_valid = check_placement_valid(placement_x, placement_y, placement_item_id, assets, placed_props)
+                draw_placement_preview(game_surface, placement_item_id, placement_x, placement_y, is_valid, assets)
+                
+                # Draw the professional UI prompt at the bottom of the screen
+                draw_interaction_prompt(
+                    game_surface, 
+                    assets["small_font"], 
+                    "WASD/Arrows to move | ENTER to place | ESC to cancel", 
+                    GAME_W // 2, 
+                    GAME_H - 20,
+                    border_color=(80, 200, 120) if is_valid else (255, 100, 100)
+                )
             # =========================
             # IRS WIRING LOGIC
             # =========================
@@ -875,9 +923,9 @@ def run(game):
 
             ticker_offset -= 1.5
             if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
-            
+            assets["placed_props"] = placed_props
             # --- UPDATED: Block physics if wiring funds! ---
-            if not any([market_open, shop_open, staff_open, accounts_open, confirm_open, wiring_funds]):
+            if not any([placement_mode,market_open, shop_open, staff_open, accounts_open, confirm_open, wiring_funds]):
                     anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
                     game_clock.update(dt)
                     game_hour_timer += dt
@@ -931,7 +979,7 @@ def run(game):
             # =========================
             # INTERACTION TEXT
             # =========================
-            if not any([market_open, shop_open, accounts_open, news_open, staff_open]):
+            if not any([placement_mode, market_open, shop_open, accounts_open, news_open, staff_open]):
                 
                 # Check if player is near the computer desk
                 if p_rect.colliderect(assets["computer_rect"].inflate(100, 100)):

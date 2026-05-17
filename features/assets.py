@@ -30,7 +30,8 @@ def load_all_assets():
     assets["wall_images"] = {}
     assets["wall_masks"] = {} 
     assets["shop_thumbnails"] = {}
-    
+    assets["placeables"] = {}
+    assets["placeable_masks"] = {}
     for item in SHOP_ITEMS:
         try:
             img = pygame.image.load(item["file"]).convert_alpha()
@@ -45,6 +46,22 @@ def load_all_assets():
                 scaled_wall = pygame.transform.scale(img, (GAME_W, GAME_H))
                 assets["wall_images"][item["id"]] = scaled_wall
                 assets["wall_masks"][item["id"]] = pygame.mask.from_surface(scaled_wall)
+            if item.get("placeable", False):
+                
+                assets["placeables"][item["id"]] = img
+                w, h = img.get_size()
+                
+                if "placeable_full_masks" not in assets:
+                    assets["placeable_full_masks"] = {}
+                assets["placeable_full_masks"][item["id"]] = pygame.mask.from_surface(img)
+                
+                if "placeable_masks" not in assets:
+                    assets["placeable_masks"] = {}
+                    
+                feet_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+                feet_rect = pygame.Rect(0, int(h * 0.75), w, int(h * 0.25))
+                feet_surf.blit(img, (0, int(h * 0.75)), area=feet_rect)
+                assets["placeable_masks"][item["id"]] = pygame.mask.from_surface(feet_surf)                
         except Exception as e:
             print(f"Warning: Could not load {item.get('file', 'Unknown')}: {e}")
             

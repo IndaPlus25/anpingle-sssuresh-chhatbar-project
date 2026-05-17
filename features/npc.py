@@ -90,7 +90,9 @@ class EmployeeNPC:
                     assets["feet_mask"], 
                     props_collision=assets.get("props_collision", []), 
                     char_width=92, char_height=92, 
-                    custom_offset_x=30, custom_offset_y=76 
+                    custom_offset_x=30, custom_offset_y=76,
+                    placed_props=assets.get("placed_props", []),
+                    placed_masks=assets.get("placeable_full_masks", {})
                 )
 
                 # Bump Detection

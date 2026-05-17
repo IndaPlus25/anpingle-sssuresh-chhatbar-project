@@ -393,20 +393,37 @@ def draw_shop_overlay(game_surface, body_font, small_font, player, icon_coin, th
             price_text = small_font.render(f"${item['price']:,}", True, GOLD)
             game_surface.blit(price_text, (row_rect.x + 140, row_rect.y + 33))
             
-            btn_rect = pygame.Rect(row_rect.right - 140, row_rect.y + 15, 120, 40)
-            is_owned = item["id"] in owned_items
-            is_equipped = item["id"] == equipped_items.get(shop_tab)
+            is_placeable = item.get("placeable", False)
+            owned_count = owned_items.count(item["id"]) # Count how many we have!
             
-            if is_equipped: btn_text, btn_color = "Equipped", GRAY
-            elif is_owned: btn_text, btn_color = "Equip", BLUE
-            else:
+            if is_placeable:
+                qty_text = small_font.render(f"Owned: {owned_count}", True, GRAY if owned_count == 0 else WHITE)
+                game_surface.blit(qty_text, (row_rect.x + 280, row_rect.y + 25))
+                
                 can_afford = player.cash >= item["price"]
-                btn_text, btn_color = "Buy", GREEN if can_afford else (140, 40, 40)
+                buy_rect = pygame.Rect(row_rect.right - 90, row_rect.y + 15, 70, 40)
+                draw_button(game_surface, buy_rect, "Buy", small_font, color=GREEN if can_afford else (140, 40, 40))
+                buy_buttons.append((buy_rect, item, "Buy"))
+                
+                if owned_count > 0:
+                    place_rect = pygame.Rect(row_rect.right - 170, row_rect.y + 15, 70, 40)
+                    draw_button(game_surface, place_rect, "Place", small_font, color=BLUE)
+                    buy_buttons.append((place_rect, item, "Place"))
+                    
+            else:
+                is_equipped = item["id"] == equipped_items.get(shop_tab)
+                btn_rect = pygame.Rect(row_rect.right - 140, row_rect.y + 15, 120, 40)
+                
+                if is_equipped: btn_text, btn_color = "Equipped", GRAY
+                elif owned_count > 0: btn_text, btn_color = "Equip", BLUE
+                else:
+                    can_afford = player.cash >= item["price"]
+                    btn_text, btn_color = "Buy", GREEN if can_afford else (140, 40, 40)
+                
+                draw_button(game_surface, btn_rect, btn_text, small_font, color=btn_color)
+                buy_buttons.append((btn_rect, item, btn_text)) 
             
-            draw_button(game_surface, btn_rect, btn_text, small_font, color=btn_color)
-            buy_buttons.append((btn_rect, item, btn_text)) 
-            
-        row_y += 85 
+        row_y += 85
         
     game_surface.set_clip(None) 
     
