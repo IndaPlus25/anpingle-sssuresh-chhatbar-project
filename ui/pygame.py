@@ -41,9 +41,9 @@ CANDLE_SPACING = 4
 # ==========================================
 MUSIC_BGM  = "features/music/prettyjohn1-corporate-background-music_33sec-483404.ogg"
 MUSIC_NEWS = "features/music/sonican-news-music-information-epic-30-seconds-471012.ogg"
-SFX_HOVER  = "features/music/finntastico-old-computer-click-152513.mp3"
-SFX_CLICK  = "features/music/freesoundeffects-button-click-289742 (1).mp3"
-SFX_BUY    = "features/music/freesound_community-cash-register-purchase-87313.mp3"
+SFX_HOVER  = "features/music/finntastico-old-computer-click-152513.wav"
+SFX_CLICK  = "features/music/freesoundeffects-button-click-289742 (1).wav"
+SFX_BUY    = "features/music/freesound_community-cash-register-purchase-87313.wav"
 
 # Tracks which track is loaded so switch_music never reloads the same file
 _CURRENTLY_PLAYING_TRACK = None
@@ -264,7 +264,7 @@ def run(game):
         frequency=44100,
         size=-16,
         channels=2,
-        buffer=4096
+        buffer=512
     )
 
     pygame.init()
