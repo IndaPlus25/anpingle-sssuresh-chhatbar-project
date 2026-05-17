@@ -1,18 +1,22 @@
 import random
+import datetime
 from game.stocks.patterns import PATTERNS
 
-def generate_random_story(stocks):
+
+def generate_random_story(stocks, game_clock):
+    """
+    Generate a random news story for a random stock.
+    """
     stock = random.choice(stocks)
     ticker = stock.name
     price = stock.price
-    
-    # Generate realistic-looking price movement stats
-    change_pct  = round(random.uniform(1.5, 18.0), 2)
-    volume_m    = round(random.uniform(1.2, 94.0), 1)
-    target      = round(price * random.uniform(1.05, 1.40), 2)
-    competitor  = random.choice([s.name for s in stocks if s.name != ticker])
-    analyst     = random.choice(["Goldman Sachs", "Morgan Stanley", "JPMorgan", "Citi", "UBS", "Deutsche Bank"])
-    exec_name   = random.choice(["CEO", "CFO", "COO", "Chairman"])
+
+    change_pct = round(random.uniform(1.5, 18.0), 2)
+    volume_m   = round(random.uniform(1.2, 94.0), 1)
+    target     = round(price * random.uniform(1.05, 1.40), 2)
+    competitor = random.choice([s.name for s in stocks if s.name != ticker])
+    analyst    = random.choice(["Goldman Sachs", "Morgan Stanley", "JPMorgan", "Citi", "UBS", "Deutsche Bank"])
+    exec_name  = random.choice(["CEO", "CFO", "COO", "Chairman"])
 
     impact = random.choice(["positive", "negative", "neutral"])
 
@@ -29,7 +33,7 @@ def generate_random_story(stocks):
                 "body":     f"In a note to clients, {analyst} upgraded {ticker} from Neutral to Buy, setting a 12-month price target of ${target}. The firm cited improving margins and a favorable macro environment as key drivers of the upgrade."
             },
             {
-                "headline": f"{ticker} announces ${ round(random.uniform(0.5, 5.0), 1)}B share buyback",
+                "headline": f"{ticker} announces ${round(random.uniform(0.5, 5.0), 1)}B share buyback",
                 "summary":  f"{ticker} management announced a major buyback program, boosting investor confidence.",
                 "body":     f"The {exec_name} of {ticker} announced a share repurchase program worth billions, signaling confidence in the company's long-term outlook. Shares jumped {change_pct}% on the news, with volume reaching {volume_m}M — well above the 30-day average."
             },
@@ -58,7 +62,7 @@ def generate_random_story(stocks):
             {
                 "headline": f"{ticker} loses ground as {competitor} gains market share",
                 "summary":  f"Investors rotated out of {ticker} and into rival {competitor} following a competitive product launch.",
-                "body":     f"{competitor}'s new product announcement appears to be weighing on {ticker}, which fell {change_pct}% in today's session on volume of {volume_m}M shares. Several analysts flagged the competitive threat as a risk to {ticker}'s near-term revenue outlook."
+                "body":     f"{competitor}'s new product announcement appears to be weighing on {ticker}, which fell {change_pct}% in today_session on volume of {volume_m}M shares. Several analysts flagged the competitive threat as a risk to {ticker}'s near-term revenue outlook."
             },
         ],
         "neutral": [
@@ -87,27 +91,57 @@ def generate_random_story(stocks):
 
     story = random.choice(templates[impact])
     return {
-        "ticker":    ticker,
-        "impact":    impact,
-        "headline":  story["headline"],
-        "summary":   story["summary"],
-        "body":      story["body"],
-        "timestamp": "Just Now",
+        "ticker":        ticker,
+        "impact":        impact,
+        "headline":      story["headline"],
+        "summary":       story["summary"],
+        "body":          story["body"],
+        "game_timestamp": game_clock.snapshot(),
     }
+
 
 class News:
     def __init__(self, news_items=None):
         self.news_items = news_items or []
         self.scroll_offset = 0
 
+        self.last_minute_checked = None
+
+        # Start somewhere between 2–4 hours since last story
+        # so the first article isn't immediate every game.
+        self.minutes_since_last_story = random.randint(120, 240)
+
+        # Rough target:
+        # 1440 mins/day ÷ 4.5 stories ≈ 320 mins average
+        self.TARGET_AVG_INTERVAL = 320
+
+    def tick(self, stocks, game_clock):
+        """DEBUG: generates a story every in-game minute."""
+
+        current_time = game_clock.current_time
+        current_min_key = (
+            current_time.year,
+            current_time.month,
+            current_time.day,
+            current_time.hour,
+            current_time.minute
+        )
+
+        if self.last_minute_checked == current_min_key:
+            return
+
+        self.last_minute_checked = current_min_key
+
+        new_item = generate_random_story(stocks, game_clock)
+        self.add_item(new_item)
+        self.apply_to_stocks(stocks)
+
     def add_item(self, item):
-        self.news_items.insert(0, item)  # newest first
+        self.news_items.insert(0, item)
+        if len(self.news_items) > 40:
+            self.news_items.pop()
 
     def apply_to_stocks(self, stocks):
-        """
-        Injects a pattern into the relevant stock based on news impact,
-        working with the GBM engine rather than nudging price directly.
-        """
         if not self.news_items:
             return
 
@@ -116,23 +150,13 @@ class News:
         impact = item.get("impact", "neutral")
 
         IMPACT_PATTERNS = {
-            "positive": [
-                "bullish_engulfing", "morning_star", "three_white_soldiers",
-                "bullish_kicker", "bullish_abandoned_baby", "rising_three_methods",
-                "bullish_mat_hold", "rounding_bottom",
-            ],
-            "negative": [
-                "bearish_engulfing", "evening_star", "three_black_crows",
-                "bearish_kicker", "bearish_abandoned_baby", "falling_three_methods",
-                "rounding_top", "triple_top",
-            ],
-            "neutral": [
-                "bearish_spinning_top", "bearish_harami", "bullish_harami",
-                "dragonfly_doji", "gravestone_doji",
-            ],
+            "positive": ["bullish_engulfing", "morning_star", "three_white_soldiers", "bullish_kicker", "bullish_abandoned_baby", "rising_three_methods", "bullish_mat_hold", "rounding_bottom"],
+            "negative": ["bearish_engulfing", "evening_star", "three_black_crows", "bearish_kicker", "bearish_abandoned_baby", "falling_three_methods", "rounding_top", "triple_top"],
+            "neutral": ["bearish_spinning_top", "bearish_harami", "bullish_harami", "dragonfly_doji", "gravestone_doji"],
         }
 
-        pattern_name = random.choice(IMPACT_PATTERNS.get(impact, IMPACT_PATTERNS["neutral"]))
+        pattern_list = IMPACT_PATTERNS.get(impact, IMPACT_PATTERNS["neutral"])
+        pattern_name = random.choice(pattern_list)
 
         for stock in stocks:
             if stock.name == ticker:
