@@ -1,6 +1,6 @@
 import pygame
-from ui.constants import GAME_W, GAME_H, CHARACTERS, MAP_PROPS, SHOP_ITEMS
-from features.animations import load_8way_animations
+from ui.constants import GAME_W, GAME_H, CHARACTERS, MAP_PROPS, SHOP_ITEMS, AVAILABLE_EMPLOYEES
+from features.animations import load_8way_animations, load_json_animations
 
 def load_all_assets():
     """Loads fonts, images, backgrounds, and animations. Returns a dictionary."""
@@ -48,7 +48,7 @@ def load_all_assets():
         except Exception as e:
             print(f"Warning: Could not load {item.get('file', 'Unknown')}: {e}")
             
-    # Default equipped desk
+    
     assets["current_desk_id"] = "desk1" 
     assets["desk_rect"] = pygame.Rect(580, 320, 180, 140)
     assets["computer_rect"] = pygame.Rect(580 + 40, 320 + 40, 100, 40)
@@ -68,7 +68,6 @@ def load_all_assets():
             print(f"Error loading fallback walls: {e}")
             assets["walls_mask"] = pygame.mask.Mask((GAME_W, GAME_H)) 
 
-    # --- THE MISSING LINE! Create the props dictionary before filling it ---
     assets["props"] = {}
 
     try:
@@ -95,13 +94,32 @@ def load_all_assets():
         try: char_images.append(pygame.image.load(c["file"]).convert_alpha())
         except: char_images.append(None)
     assets["char_images"] = char_images
-
+    # characters
     assets["all_char_anims"] = [
         load_8way_animations("ui/characters/char1"),
         load_8way_animations("ui/characters/char2"),
         load_8way_animations("ui/characters/char3")
     ]
+    #IRS
+    try:
+        assets["irs_anims"] = load_json_animations("ui/characters/IRS")
+    except Exception as e:
+        print(f"Warning: Could not load IRS animations: {e}")
+        assets["irs_anims"] = None
 
+    assets["staff_anims"] = {}
+    assets["staff_portraits"] = {}
+    
+    for emp in AVAILABLE_EMPLOYEES:
+        assets["staff_anims"][emp["id"]] = load_json_animations(emp["folder"])
+        
+        try:
+            port = pygame.image.load(emp["portrait"]).convert_alpha()
+            assets["staff_portraits"][emp["id"]] = pygame.transform.scale(port, (40, 40))
+        except:
+            assets["staff_portraits"][emp["id"]] = None
+
+    # 4. Icons
     try:
         assets["icon_coin"] = pygame.transform.scale(pygame.image.load("ui/assets/coin.png").convert_alpha(), (36, 36))
         assets["icon_play"] = pygame.transform.scale(pygame.image.load("ui/assets/play.png").convert_alpha(), (28, 28))
