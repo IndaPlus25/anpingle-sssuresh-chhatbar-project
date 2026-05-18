@@ -84,4 +84,4 @@ AVAILABLE_EMPLOYEES = [
 ]
 
 #game time per hour
-GAME_MINUTE_MS = 67
+GAME_MINUTE_MS = 500

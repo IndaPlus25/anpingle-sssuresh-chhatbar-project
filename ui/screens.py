@@ -56,8 +56,7 @@ def draw_char_select(game_surface, title_font, body_font, small_font, selected_i
     return card_rects, back_btn, confirm_btn
 
 
-def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks, selected_stock_idx=0):
-    def draw_text_input(game_surface, rect, text, font, placeholder_font, is_active=False, placeholder="Enter amount..."):
+def draw_text_input(game_surface, rect, text, font, placeholder_font, is_active=False, placeholder="Enter amount..."):
         """Draws a text input field with the given text and optional cursor."""
         # Background
         bg_color = (30, 35, 55) if is_active else (20, 22, 42)
@@ -964,7 +963,7 @@ def draw_day_night_cycle(game_surface, game_clock, player, computer_rect):
             overlay.blit(light_surf, (center[0] - radius, center[1] - radius), special_flags=pygame.BLEND_RGB_ADD)
 
         # Draw a warm aura around the Player
-        draw_light((player.x + 32, player.y + 40), 160, (glow_max, glow_max, int(glow_max*0.8)))
+        draw_light((player.x +44, player.y + 40), 160, (glow_max, glow_max, int(glow_max*0.8)))
         
         # Draw a bright cyan glow emitting from the computer monitors
         if computer_rect:
