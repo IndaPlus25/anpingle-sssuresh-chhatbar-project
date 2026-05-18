@@ -910,7 +910,7 @@ def draw_accounts_screen(game_surface, title_font, body_font, small_font, player
     pygame.draw.rect(game_surface, (45, 25, 25), tax_rect, border_radius=8)
     pygame.draw.rect(game_surface, RED, tax_rect, 1, border_radius=8)
     game_surface.blit(small_font.render("Pending Tax Liability", True, (255, 150, 150)), (tax_rect.x + 20, tax_rect.y + 15))
-    game_surface.blit(small_font.render(f"${player.owed_taxes:,.2f}", True, RED), (tax_rect.x + 20, tax_rect.y + 45))
+    game_surface.blit(small_font.render(f"${getattr(player, 'pending_tax', 0):,.2f}", True, RED), (tax_rect.x + 20, tax_rect.y + 45))
 
     return close_btn, repat_btn
 
@@ -1039,9 +1039,9 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
     total_realized_pnl = 0
     if hasattr(player, 'trade_history'):
         for trade in player.trade_history:
-            if trade["action"] == "SELL":
+            # Added WIRE and REPAT to the master list!
+            if trade["action"] in ["SELL", "FINE", "TAX", "WIRE", "REPAT"]: 
                 total_realized_pnl += trade.get("pnl", 0)
-
     # TOP STATS PANEL
     stats_rect = pygame.Rect(box.x + 30, box.y + 70, win_w - 60, 90)
     pygame.draw.rect(game_surface, (30, 35, 45), stats_rect, border_radius=8)
@@ -1121,15 +1121,28 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
                 if row_rect.bottom > list_rect.top and row_rect.top < list_rect.bottom:
                     pygame.draw.rect(game_surface, (38, 42, 55), row_rect, border_radius=6)
                     
-                    action_col = GREEN if item["action"] == "BUY" else RED
+                    # Make BUYS and REPAT green, everything else red
+                    action_col = GREEN if item["action"] in ["BUY", "REPAT"] else RED
                     game_surface.blit(small_font.render(item["action"], True, action_col), (row_rect.x + 15, row_rect.y + 12))
                     game_surface.blit(small_font.render(item["ticker"], True, WHITE), (row_rect.x + 85, row_rect.y + 12))
-                    game_surface.blit(small_font.render(f"{item['shares']} @ ${item['price']:.2f}", True, GRAY), (row_rect.x + 175, row_rect.y + 12))
+                    
+                    # Custom text for special actions
+                    if item["action"] in ["FINE", "TAX", "WIRE", "REPAT"]:
+                        if item["action"] in ["FINE", "TAX"]:
+                            lbl, lbl_col = "FEDERAL DEDUCTION", (180, 60, 60)
+                        elif item["action"] == "WIRE":
+                            lbl, lbl_col = "FUNDS HIDDEN", (180, 60, 60)
+                        else:
+                            lbl, lbl_col = "FUNDS REPATRIATED", (60, 180, 60)
+                        game_surface.blit(small_font.render(lbl, True, lbl_col), (row_rect.x + 160, row_rect.y + 12))
+                    else:
+                        game_surface.blit(small_font.render(f"{item['shares']} @ ${item['price']:.2f}", True, GRAY), (row_rect.x + 160, row_rect.y + 12))
                     
                     tot_surf = small_font.render(f"Total: ${item['total']:,.2f}", True, WHITE)
                     game_surface.blit(tot_surf, (row_rect.x + 400, row_rect.y + 12))
                     
-                    if item["action"] == "SELL":
+                    # Print the P&L math
+                    if item["action"] in ["SELL", "FINE", "TAX", "WIRE", "REPAT"]:
                         h_sign = "+" if item["pnl"] >= 0 else "-"
                         pnl_color = GREEN if item["pnl"] >= 0 else RED
                         pnl_surf = small_font.render(f"{h_sign}${abs(item['pnl']):,.2f} P&L", True, pnl_color)
