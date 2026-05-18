@@ -4,7 +4,7 @@ import random
 import os
 
 from .constants import *
-from .screens import draw_menu, draw_char_select, draw_market_overlay, draw_shop_overlay, draw_confirmation_screen, draw_news_screen, draw_news_detail, draw_staff_panel_overlay, draw_accounts_screen, draw_interaction_prompt
+from .screens import draw_menu, draw_day_night_cycle, draw_char_select, draw_market_overlay, draw_shop_overlay, draw_confirmation_screen, draw_news_screen, draw_news_detail, draw_staff_panel_overlay, draw_accounts_screen, draw_interaction_prompt
 from .assets.stock_assets import (
     CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info
 )
@@ -937,13 +937,22 @@ def run(game):
                     if game_hour_timer >= GAME_HOUR_MS:
                         game_hour_timer -= GAME_HOUR_MS
                         
+                        is_night = game_clock.current_time.hour >= 18 or game_clock.current_time.hour < 6
+
                         total_salary_paid = 0
                         for emp_id, emp_npc in active_staff.items():
-                            salary = emp_npc.config["salary"]
+                            base_salary = emp_npc.config["salary"]
+
+                            if is_night:
+                                salary = int(base_salary * 2.5)
+                                emp_npc.energy = max(0, emp_npc.energy - 10) 
+                            else:
+                                salary = base_salary
+
                             player.cash -= salary
                             total_salary_paid += salary
                             if getattr(emp_npc, 'role', 'Salesman') == "Salesman" and emp_npc.energy > 0:
-                                player.cash += (salary * 2.0)
+                                player.cash += (base_salary * 2.0)
 
                         hours_until_audit -= 1
                         if hours_until_audit <= 0 and not audit_active:
@@ -978,7 +987,7 @@ def run(game):
                 assets["all_char_anims"][selected_char],
                 assets["char_images"][selected_char]
             )
-
+            draw_day_night_cycle(game_surface, game_clock, player, assets.get("computer_rect"))
             # =========================
             # INTERACTION TEXT
             # =========================

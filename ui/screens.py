@@ -920,3 +920,55 @@ def draw_interaction_prompt(surface, font, text, center_x, bottom_y, border_colo
     
     # Draw text exactly in the center of the box
     surface.blit(text_surf, (box_x + padding_x, box_y + padding_y))
+
+def draw_day_night_cycle(game_surface, game_clock, player, computer_rect):
+    """Draws a dynamic day/night lighting cycle over the office."""
+    import pygame
+    
+    # Calculate time as a smooth float (e.g., 18.5 is 6:30 PM)
+    time_val = game_clock.current_time.hour + (game_clock.current_time.minute / 60.0)
+
+    # 1. Calculate Darkness Level (1.0 is bright noon, 0.35 is pitch black night)
+    min_light = 0.35
+    if 8.0 <= time_val <= 16.0:
+        intensity = 1.0   # Day
+    elif 16.0 < time_val < 19.0:
+        intensity = min_light + (1.0 - min_light) * (1.0 - ((time_val - 16.0) / 3.0)) # Sunset fade
+    elif 19.0 <= time_val <= 24.0 or 0.0 <= time_val <= 5.0:
+        intensity = min_light # Deep Night
+    elif 5.0 < time_val < 8.0:
+        intensity = min_light + (1.0 - min_light) * ((time_val - 5.0) / 3.0) # Sunrise fade
+
+    if intensity >= 0.99:
+        return # Skip drawing if it's full daylight
+
+    # 2. Create the Lighting Canvas
+    r = int(255 * intensity)
+    g = int(255 * intensity)
+    b = int(255 * max(intensity, 0.55)) 
+    
+    overlay = pygame.Surface(game_surface.get_size())
+    overlay.fill((r, g, b))
+
+    # 3. Add Soft Glowing Lights (Using Additive Blending)
+    if intensity < 0.8:
+        glow_max = int(255 * (1.0 - intensity) * 0.9) 
+
+        def draw_light(center, radius, color_rgb):
+            light_surf = pygame.Surface((radius * 2, radius * 2))
+            light_surf.fill((0, 0, 0)) 
+            for i in range(10, 0, -1):
+                pct = i / 10.0
+                c = (int(color_rgb[0] * pct), int(color_rgb[1] * pct), int(color_rgb[2] * pct))
+                pygame.draw.circle(light_surf, c, (radius, radius), int(radius * (1.0 - pct)))
+            overlay.blit(light_surf, (center[0] - radius, center[1] - radius), special_flags=pygame.BLEND_RGB_ADD)
+
+        # Draw a warm aura around the Player
+        draw_light((player.x + 32, player.y + 40), 160, (glow_max, glow_max, int(glow_max*0.8)))
+        
+        # Draw a bright cyan glow emitting from the computer monitors
+        if computer_rect:
+            draw_light(computer_rect.center, 140, (int(glow_max*0.5), int(glow_max*0.9), glow_max)) 
+
+    # 4. Multiply the lighting canvas onto the main screen
+    game_surface.blit(overlay, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
