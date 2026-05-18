@@ -46,7 +46,8 @@ def draw_char_select(game_surface, title_font, body_font, small_font, selected_i
             display_img = char_images[i]
         if display_img:
             img = pygame.transform.scale(display_img, (128, 128))
-            game_surface.blit(img, img.get_rect(centerx=rect.centerx, y=180))
+            img_rect = img.get_rect(centerx=rect.centerx, y=180)
+            game_surface.blit(img, img_rect)
         game_surface.blit(body_font.render(char["name"], True, WHITE if i == selected_idx else LGRAY),
                           body_font.render(char["name"], True, WHITE).get_rect(centerx=rect.centerx, y=330))
         game_surface.blit(small_font.render(char["desc"], True, LGRAY),
@@ -818,9 +819,9 @@ def draw_day_night_cycle(game_surface, game_clock, player, computer_rect):
     time_val = game_clock.current_time.hour + (game_clock.current_time.minute / 60.0)
     min_light = 0.35
     if 8.0 <= time_val <= 16.0: intensity = 1.0   
-    elif 16.0 < time_val < 19.0: intensity = min_light + (1.0 - min_light) * (1.0 - ((time_val - 16.0) / 3.0)) 
-    elif 19.0 <= time_val <= 24.0 or 0.0 <= time_val <= 5.0: intensity = min_light 
-    elif 5.0 < time_val < 8.0: intensity = min_light + (1.0 - min_light) * ((time_val - 5.0) / 3.0) 
+    elif 16.0 < time_val < 19.0: intensity = min_light + (1.0 - min_light) * (1.0 - ((time_val - 16.0) / 3.0))   
+    elif 19.0 <= time_val <= 24.0 or 0.0 <= time_val <= 5.0: intensity = min_light   
+    elif 5.0 < time_val < 8.0: intensity = min_light + (1.0 - min_light) * ((time_val - 5.0) / 3.0)   
 
     if intensity >= 0.99: return 
 
@@ -1064,16 +1065,28 @@ def draw_settings_overlay(game_surface, title_font, body_font, small_font, game_
 
     controls_close = None
     if _show_controls:
-        popup = pygame.Rect(panel.x + 280, panel.y + 260, 360, 200)
+        popup = pygame.Rect(panel.x + 230, panel.y + 160, 440, 310)
         pygame.draw.rect(game_surface, (30, 35, 50), popup, border_radius=10)
         pygame.draw.rect(game_surface, BLUE, popup, 2, border_radius=10)
-        game_surface.blit(body_font.render("CONTROLS", True, GOLD), (popup.x + 20, popup.y + 15))
+        game_surface.blit(body_font.render("CONTROLS MANUAL", True, GOLD), (popup.x + 20, popup.y + 15))
 
-        controls = ["WASD / Arrow Keys - Move", "E - Interact", "ESC - Pause / Menu", "ENTER - Start Game", "Q - Quit", "Mouse - UI Buttons"]
-        yy = popup.y + 60
+        # --- EXTENSIVE CONTROLS DOCUMENTATION ---
+        controls = [
+            "WASD / Arrow Keys - Character Movement", 
+            "E - Interact with Main Computer Desk", 
+            "TAB - Toggle Office Furnishing Shop", 
+            "T - Open Staff Recruitment Panel",
+            "P - Open Personal Portfolio Dashboard",
+            "N - Toggle Live Market News Feed",
+            "ESC - Settings Overlay / Close active panels", 
+            "Q - Force Exit Active Trade Desk Screen",
+            "B - Accounts",
+            "Mouse Click - Menu & Interface Buttons"
+        ]
+        yy = popup.y + 55
         for line in controls:
             game_surface.blit(small_font.render(line, True, WHITE), (popup.x + 20, yy))
-            yy += 24
+            yy += 25
         controls_close = draw_close_button(game_surface, popup.right - 45, popup.y + 10, small_font)
 
     return {
