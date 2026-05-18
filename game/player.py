@@ -3,6 +3,7 @@ class Player:
         self.name = name
         self.cash = 1000000000
         self.portfolio = {}
+        self.shorts = {}  # {stock_name: {"qty": int, "entry_price": float}}
         self.x = 300
         self.y = 200
         self.direction = "south"

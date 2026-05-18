@@ -327,7 +327,7 @@ def run(game):
     tab_buttons = []
     selected_stock_idx = 0
     market_arrow_left = market_arrow_right = market_close_btn = pygame.Rect(0,0,0,0)
-    market_buy_btn = market_sell_btn = market_amount_input = pygame.Rect(0,0,0,0)
+    market_buy_btn = market_short_btn = market_amount_input = pygame.Rect(0,0,0,0)
     market_amount_text = ""
     market_input_active = False
     
@@ -665,6 +665,8 @@ def run(game):
                             # Make sure portfolio exists so we don't crash
                             if not hasattr(player, 'portfolio'):
                                 player.portfolio = {}
+                            if not hasattr(player, 'shorts'):
+                                player.shorts = {}
 
                             if market_buy_btn.collidepoint(gpt) and amount > 0:
                                 total_cost = amount * current_stock.price
@@ -676,15 +678,26 @@ def run(game):
                                     player.portfolio[current_stock.name] += amount
                                     market_amount_text = ""
 
-                            if market_sell_btn.collidepoint(gpt) and amount > 0:
-                                owned = player.portfolio.get(current_stock.name, 0)
-                                if owned >= amount:
-                                    play(sounds, "buy")
-                                    player.cash += amount * current_stock.price
-                                    player.portfolio[current_stock.name] -= amount
-                                    if player.portfolio[current_stock.name] <= 0:
-                                        del player.portfolio[current_stock.name]
-                                    market_amount_text = ""
+                            if market_short_btn.collidepoint(gpt) and amount > 0:
+                                # SHORT: Player opens a short position.
+                                # They receive cash equal to amount * current price upfront.
+                                # If stock goes up later, they lose money.
+                                # If stock goes down later, they gain money.
+                                short_proceeds = amount * current_stock.price
+                                play(sounds, "buy")
+                                player.cash += short_proceeds
+                                if current_stock.name not in player.shorts:
+                                    player.shorts[current_stock.name] = {"qty": 0, "entry_price": 0.0}
+                                existing = player.shorts[current_stock.name]
+                                # Weighted average entry price for multiple shorts
+                                total_qty = existing["qty"] + amount
+                                if total_qty > 0:
+                                    existing["entry_price"] = (
+                                        (existing["entry_price"] * existing["qty"]) +
+                                        (current_stock.price * amount)
+                                    ) / total_qty
+                                existing["qty"] = total_qty
+                                market_amount_text = ""
                         elif shop_open:
                             if shop_close_btn.collidepoint(gpt) or any(t["rect"].collidepoint(gpt) for t in tab_buttons) or any(b[0].collidepoint(gpt) for b in buy_buttons):
                                 clicked_valid_button = True
@@ -814,6 +827,23 @@ def run(game):
                 }
 
                 game.update_stocks()
+
+                # Settle short position P&L after price update
+                if hasattr(player, 'shorts'):
+                    for stock in game.stocks:
+                        if stock.name in player.shorts:
+                            short_pos = player.shorts[stock.name]
+                            if short_pos["qty"] > 0:
+                                old_price = stock_prev_prices.get(stock.name, stock.price)
+                                price_change = stock.price - old_price
+                                # Inverse: stock goes up → player loses; stock goes down → player gains
+                                pnl = -price_change * short_pos["qty"]
+                                player.cash += pnl
+                                # Remove position if player is bankrupt on this short
+                                if player.cash < 0:
+                                    # Margin call: forcibly close the short
+                                    player.shorts[stock.name] = {"qty": 0, "entry_price": 0.0}
+                                    del player.shorts[stock.name]
 
                 last_update = pygame.time.get_ticks()
                 
@@ -1078,10 +1108,11 @@ def run(game):
             # UI OVERLAYS
             # =========================
             if market_open:
-                market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input, market_close_btn = draw_market_overlay(
+                market_arrow_left, market_arrow_right, market_buy_btn, market_short_btn, market_amount_input, market_close_btn = draw_market_overlay(
                     game_surface, assets["body_font"], assets["hud_font"],
                     assets["small_font"], game.stocks, selected_stock_idx,
-                    player.cash, player.portfolio, market_amount_text, market_input_active, ticker_offset
+                    player.cash, player.portfolio, player.shorts,
+                    market_amount_text, market_input_active, ticker_offset
                 )
                 
             if staff_open:
