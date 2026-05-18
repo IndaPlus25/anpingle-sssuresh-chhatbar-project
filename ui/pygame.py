@@ -326,7 +326,7 @@ def run(game):
     buy_buttons = []
     tab_buttons = []
     selected_stock_idx = 0
-    market_arrow_left = market_arrow_right = pygame.Rect(0,0,0,0)
+    market_arrow_left = market_arrow_right = market_close_btn = pygame.Rect(0,0,0,0)
     market_buy_btn = market_sell_btn = market_amount_input = pygame.Rect(0,0,0,0)
     market_amount_text = ""
     market_input_active = False
@@ -539,9 +539,9 @@ def run(game):
                     # =========================
                     # MARKET AMOUNT INPUT
                     # =========================
-                    elif market_open and event.key == pygame.K_BACKSPACE:
+                    elif market_input_active and market_open and event.key == pygame.K_BACKSPACE:
                         market_amount_text = market_amount_text[:-1]
-                    elif market_open and event.unicode.isdigit():
+                    elif market_input_active and market_open and event.unicode.isdigit():
                         if len(market_amount_text) < 10:
                             market_amount_text += event.unicode
                     elif event.key == pygame.K_TAB and not confirm_open:  
@@ -640,16 +640,15 @@ def run(game):
                             market_open = shop_open = staff_open = False
                             
                         if market_open:
-                            if market_arrow_left.collidepoint(gpt) or market_arrow_right.collidepoint(gpt):
+                            if market_arrow_left.collidepoint(gpt) or market_arrow_right.collidepoint(gpt) or market_close_btn.collidepoint(gpt):
                                 clicked_valid_button = True
+                            if market_close_btn.collidepoint(gpt):
+                                market_open = False
                             if market_arrow_left.collidepoint(gpt):
                                 selected_stock_idx = (selected_stock_idx - 1) % len(game.stocks)
                             elif market_arrow_right.collidepoint(gpt):
                                 selected_stock_idx = (selected_stock_idx + 1) % len(game.stocks)
 
-                        elif shop_open:
-                            if shop_close_btn.collidepoint(gpt) or any(t["rect"].collidepoint(gpt) for t in tab_buttons) or any(b[0].collidepoint(gpt) for b in buy_buttons):
-                                clicked_valid_button = True
                             # Amount input field - toggle active state
                             if market_amount_input.collidepoint(gpt):
                                 market_input_active = True
@@ -663,9 +662,14 @@ def run(game):
                             except ValueError:
                                 amount = 0
 
+                            # Make sure portfolio exists so we don't crash
+                            if not hasattr(player, 'portfolio'):
+                                player.portfolio = {}
+
                             if market_buy_btn.collidepoint(gpt) and amount > 0:
                                 total_cost = amount * current_stock.price
-                                if player.cash >= total_cost and amount > 0:
+                                if player.cash >= total_cost:
+                                    play(sounds, "buy") # Added the cash register sound!
                                     player.cash -= total_cost
                                     if current_stock.name not in player.portfolio:
                                         player.portfolio[current_stock.name] = 0
@@ -675,13 +679,16 @@ def run(game):
                             if market_sell_btn.collidepoint(gpt) and amount > 0:
                                 owned = player.portfolio.get(current_stock.name, 0)
                                 if owned >= amount:
+                                    play(sounds, "buy")
                                     player.cash += amount * current_stock.price
                                     player.portfolio[current_stock.name] -= amount
                                     if player.portfolio[current_stock.name] <= 0:
                                         del player.portfolio[current_stock.name]
                                     market_amount_text = ""
+                        elif shop_open:
+                            if shop_close_btn.collidepoint(gpt) or any(t["rect"].collidepoint(gpt) for t in tab_buttons) or any(b[0].collidepoint(gpt) for b in buy_buttons):
+                                clicked_valid_button = True
 
-                        if shop_open:
                             if shop_close_btn.collidepoint(gpt):
                                 shop_open = False
                             for tab in tab_buttons:
@@ -1071,10 +1078,10 @@ def run(game):
             # UI OVERLAYS
             # =========================
             if market_open:
-                market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input = draw_market_overlay(
+                market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input, market_close_btn = draw_market_overlay(
                     game_surface, assets["body_font"], assets["hud_font"],
                     assets["small_font"], game.stocks, selected_stock_idx,
-                    player.cash, player.portfolio, market_amount_text, market_input_active
+                    player.cash, player.portfolio, market_amount_text, market_input_active, ticker_offset
                 )
                 
             if staff_open:
