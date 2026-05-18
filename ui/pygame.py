@@ -258,17 +258,16 @@ def draw_stock_summary(screen, font, stock, x, y):
 
 
 def run(game):
-    if pygame.mixer.get_init():
-        pygame.mixer.quit()
-    pygame.quit()
-
-    # 2. Force the exact settings DIRECTLY into the mixer initialization
     pygame.mixer.pre_init(buffer=1024)
-    # pygame.mixer.init(frequency=48000, size=-16, channels=2, buffer=2048)
-    
-    # 3. NOW initialize the rest of Pygame
     pygame.init()
-    pygame.mixer.set_num_channels(32)
+
+    try:
+        pygame.mixer.init()
+        pygame.mixer.set_num_channels(16)
+    except Exception as e:
+        print(f"[Audio] Mixer initialization failed: {e}")
+        print("[Audio] Running without sound")
+
 
     display_info = pygame.display.Info()
     screen       = pygame.display.set_mode(
