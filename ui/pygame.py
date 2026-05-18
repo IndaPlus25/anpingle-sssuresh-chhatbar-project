@@ -240,7 +240,15 @@ def run(game):
     wiring_funds = False
     post_audit_message = ""
     post_audit_timer = 0
-    
+    player.taxable_profit = 0  
+    game_clock = GameClock()
+    dt = 16 
+
+    running = True
+
+    # ==========================================
+    # INITIAL GAME STATE
+    # ==========================================
     state         = "menu"
     running       = True
     selected_char = 0
@@ -368,13 +376,29 @@ def run(game):
                     portfolio_scroll_y = max(portfolio_max_scroll, min(0, portfolio_scroll_y))
 
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_F12 and state == "game" and not audit_active and not is_settings_open():
-                    audit_active = True
-                    post_audit_message = ""
-                    accountants = sum(1 for e in active_staff.values() if getattr(e, 'role', 'Salesman') == "Accountant" and e.energy > 0)
-                    tax_rate = max(0.15 - (0.02 * accountants), 0.05)
-                    player.owed_taxes = player.cash * tax_rate
-                    irs_agent = IRSAgent(GAME_W // 2, GAME_H + 50, assets["computer_rect"].x, assets["computer_rect"].y + 80)
+
+                # =========================
+                # IRS TEST TRIGGER (F12)
+                # =========================
+                if event.key == pygame.K_F12 and state == "game" and not audit_active:
+                    if not hasattr(player, 'taxable_profit'): player.taxable_profit = 0
+                    
+                    if player.taxable_profit > 0:
+                        audit_active = True
+                        post_audit_message = ""
+                        accountants = sum(1 for e in active_staff.values() if getattr(e, 'role', 'Salesman') == "Accountant" and e.energy > 0)
+                        
+                        # Save the tax rate and the starting profit for the audit
+                        player.tax_rate = max(0.15 - (0.02 * accountants), 0.05)
+                        player.audit_starting_profit = player.taxable_profit 
+                        player.hidden_profit = 0
+                        player.wire_progress = 0.0
+                        
+                        desk_x = assets["computer_rect"].x
+                        desk_y = assets["computer_rect"].y
+                        irs_agent = IRSAgent(GAME_W // 2, GAME_H + 50, desk_x, desk_y + 80)
+                    else:
+                        print("No capital gains to tax this week!")
 
                 if event.key in (pygame.K_q, pygame.K_ESCAPE) and state != "game" and not is_settings_open():
                     if state == "char_select": state = "menu"
@@ -526,7 +550,10 @@ def run(game):
                                     play(sounds, "buy")
                                     avg_cost = player.cost_basis.get(current_stock.name, current_stock.price) if hasattr(player, 'cost_basis') else current_stock.price
                                     realized_pnl = (amount * current_stock.price) - (amount * avg_cost)
-                                    if not hasattr(player, 'trade_history'): player.trade_history = []
+                                    if not hasattr(player, 'taxable_profit'): player.taxable_profit = 0
+                                    player.taxable_profit += realized_pnl
+                                    if not hasattr(player, 'trade_history'):
+                                        player.trade_history = []
                                     player.trade_history.append({
                                         "action": "SELL", "ticker": current_stock.name,
                                         "shares": amount, "price": current_stock.price,
@@ -559,7 +586,18 @@ def run(game):
                         if accounts_open:
                             if accounts_close_btn.collidepoint(gpt): accounts_open = False
                             elif repatriate_btn.collidepoint(gpt) and player.offshore > 0:
-                                player.cash += (player.offshore * 0.90)
+                                penalty = player.offshore * 0.10
+                                repat_amount = player.offshore - penalty
+                                
+
+                                if not hasattr(player, 'trade_history'): player.trade_history = []
+                                player.trade_history.append({
+                                    "action": "REPAT", "ticker": "OFFSHORE",
+                                    "shares": 0, "price": 0,
+                                    "total": repat_amount, "pnl": repat_amount 
+                                })
+                                
+                                player.cash += repat_amount
                                 player.offshore = 0
                         if staff_open:
                             if staff_close_btn.collidepoint(gpt): staff_open = False
@@ -637,42 +675,103 @@ def run(game):
             p_rect = pygame.Rect(player.x, player.y, 64, 64)
             wiring_funds = False
             if audit_active and irs_agent.state == "approaching":
-                if p_rect.colliderect(assets["computer_rect"].inflate(100, 100)) and keys_pressed[pygame.K_SPACE]:
-                    wiring_funds = True
-                    transfer_rate = 20000000 * (dt / 1000)
-                    if player.cash >= transfer_rate:
-                        player.cash -= transfer_rate; player.offshore += transfer_rate
-                    else:
-                        player.offshore += player.cash; player.cash = 0
+                if p_rect.colliderect(assets["computer_rect"].inflate(100, 100)):
+                    # Check if there is still onshore profit to hide
+                    if keys_pressed[pygame.K_SPACE] and player.taxable_profit > 0:
+                        wiring_funds = True
+                        
+                        # Transfer 20% of your total profits per second
+                        transfer_pct_per_sec = 0.15 
+                        chunk = player.audit_starting_profit * transfer_pct_per_sec * (dt / 1000.0)
+                        
+                        chunk = min(chunk, player.taxable_profit) # Can't hide more than is left
+                        chunk = min(chunk, player.cash)           # Can't hide money you don't have
+                        
+                        if chunk > 0:
+                            player.cash -= chunk
+                            player.offshore += chunk
+                            
+                            # Move the profit from "Taxable" to "Hidden"
+                            player.taxable_profit -= chunk 
+                            player.hidden_profit += chunk
+                            
+                            # Calculate the progress bar
+                            player.wire_progress = player.hidden_profit / player.audit_starting_profit
 
-            menu_btn_rect = draw_top_bar(game_surface, assets["hud_font"], assets["small_font"], assets["hud_bold_font"], player, assets["icon_coin"], ticker_offset, game.stocks, stock_prev_prices)
+
+            # =========================
+            # TOP BAR
+            # =========================
+            menu_btn_rect = draw_top_bar(
+                game_surface,
+                assets["hud_font"], assets["small_font"], assets["hud_bold_font"],
+                player, assets["icon_coin"], ticker_offset,
+                game.stocks, stock_prev_prices
+            )
+
             draw_button(game_surface, news_btn_rect, "📰 News", assets["small_font"], color=(40, 80, 120))
 
             ticker_offset -= 1.5
             if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
             assets["placed_props"] = placed_props
-
-            if not any([placement_mode, market_open, shop_open, staff_open, accounts_open, confirm_open, wiring_funds, is_settings_open(), portfolio_open]):
+            if not any([placement_mode,market_open, shop_open, staff_open, accounts_open, confirm_open, wiring_funds, portfolio_open]):
                 anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
                 game_clock.update(dt)
                 game_hour_timer += dt
+                
                 if game_hour_timer >= GAME_HOUR_MS:
                     game_hour_timer -= GAME_HOUR_MS
-                    is_night = game_clock.current_time.hour >= 18 or game_clock.current_time.hour < 6
-                    for emp_id, emp_npc in active_staff.items():
-                        salary = int(emp_npc.config["salary"] * 2.5) if is_night else emp_npc.config["salary"]
-                        if is_night: emp_npc.energy = max(0, emp_npc.energy - 10)
-                        player.cash -= salary
-                        if getattr(emp_npc, 'role', 'Salesman') == "Salesman" and emp_npc.energy > 0: player.cash += (emp_npc.config["salary"] * 2.0)
-                    hours_until_audit -= 1
-                    if hours_until_audit <= 0 and not audit_active:
-                        audit_active = True
-                        accountants = sum(1 for e in active_staff.values() if getattr(e, 'role', 'Salesman') == "Accountant" and e.energy > 0)
-                        player.owed_taxes = player.cash * max(0.15 - (0.02 * accountants), 0.05)
-                        irs_agent = IRSAgent(GAME_W // 2, GAME_H + 50, assets["computer_rect"].x, assets["computer_rect"].y + 80)
-                        hours_until_audit = 168
+                    
+                    if not hasattr(player, 'taxable_profit'): player.taxable_profit = 0
+                    live_accountants = sum(1 for e in active_staff.values() if getattr(e, 'role', 'Salesman') == "Accountant" and e.energy > 0)
+                    live_rate = max(0.35 - (0.03 * live_accountants), 0.05)
+                    
+                    player.pending_tax = player.taxable_profit * live_rate if player.taxable_profit > 0 else 0
 
-                for emp_id, emp_npc in active_staff.items(): emp_npc.update(dt, assets)
+                    is_night = game_clock.current_time.hour >= 18 or game_clock.current_time.hour < 6
+
+                    total_salary_paid = 0
+                    for emp_id, emp_npc in active_staff.items():
+                        base_salary = emp_npc.config["salary"]
+
+                        if is_night:
+                            salary = int(base_salary * 2.5)
+                            emp_npc.energy = max(0, emp_npc.energy - 10) 
+                        else:
+                            salary = base_salary
+
+                        player.cash -= salary
+                        total_salary_paid += salary
+                        if getattr(emp_npc, 'role', 'Salesman') == "Salesman" and emp_npc.energy > 0:
+                            player.cash += (base_salary * 2.0)
+
+                    hours_until_audit -= 1
+                    if hours_until_audit <= 0:
+                        if not hasattr(player, 'taxable_profit'): player.taxable_profit = 0
+                        
+                        if player.taxable_profit > 0 and not audit_active:
+                            audit_active = True
+                            post_audit_message = ""
+                            accountants = sum(1 for e in active_staff.values() if getattr(e, 'role', 'Salesman') == "Accountant" and e.energy > 0)
+                            
+                            # --- NEW: Save the starting state for the hide-the-money mini-game! ---
+                            player.tax_rate = max(0.35 - (0.02 * accountants), 0.05)
+                            player.audit_starting_profit = player.taxable_profit 
+                            player.hidden_profit = 0
+                            player.wire_progress = 0.0
+                            
+                            desk_x = assets["computer_rect"].x
+                            desk_y = assets["computer_rect"].y
+                            irs_agent = IRSAgent(GAME_W // 2, GAME_H + 50, desk_x, desk_y + 80)
+                        else:
+                            # If no profit was made, wipe the slate clean for next week anyway
+                            player.taxable_profit = 0
+                            
+                        hours_until_audit = 168 # Reset timer for next week
+
+                # Aligned perfectly to 4-spaces inside the if statement!
+                for emp_id, emp_npc in active_staff.items(): 
+                    emp_npc.update(dt, assets)
                 
             for emp_id, emp_npc in active_staff.items():
                 if emp_id in assets["staff_anims"]: emp_npc.draw(game_surface, assets["staff_anims"][emp_id], assets["small_font"])
@@ -680,39 +779,119 @@ def run(game):
             draw_clock_overlay(game_surface, assets["small_font"], assets["hud_font"], game_clock)
             p_rect = draw_player(game_surface, player, anim_frame, assets["all_char_anims"][selected_char], assets["char_images"][selected_char])
             draw_day_night_cycle(game_surface, game_clock, player, assets.get("computer_rect"))
-
-            if not any([placement_mode, market_open, shop_open, accounts_open, news_open, staff_open, is_settings_open(), portfolio_open]):
+            # =========================
+            # INTERACTION TEXT
+            # =========================
+            if not any([placement_mode, market_open, shop_open, accounts_open, news_open, staff_open, portfolio_open, confirm_open]):
+                
+                # Check if player is near the computer desk
                 if p_rect.colliderect(assets["computer_rect"].inflate(100, 100)):
-                    prompt_x, prompt_y = assets["computer_rect"].centerx, assets["computer_rect"].top - 10
-                    if audit_active and irs_agent.state == "approaching" and player.owed_taxes > 0:
-                        draw_interaction_prompt(game_surface, assets["small_font"], "Hold SPACE to transfer money", prompt_x, prompt_y, border_color=(255, 100, 100))
+                    
+                    # Position the prompt perfectly centered above the computer
+                    prompt_x = assets["computer_rect"].centerx
+                    prompt_y = assets["computer_rect"].top - 10
+                    
+                    if audit_active and irs_agent.state == "approaching":
+                        if wiring_funds:
+                            pct = int(player.wire_progress * 100)
+                            draw_interaction_prompt(
+                                game_surface, assets["small_font"], 
+                                f"WIRING OFFSHORE: {pct}%", prompt_x, prompt_y,
+                                border_color=(255, 100, 100)
+                            )
+                            
+                            bar_w = 180
+                            bar_h = 8
+                            bar_x = prompt_x - (bar_w // 2)
+                            bar_y = prompt_y + 18 # Placed right below the text box
+                            
+                            # Draw dark background
+                            pygame.draw.rect(game_surface, (40, 40, 40), (bar_x, bar_y, bar_w, bar_h), border_radius=4)
+                            # Draw green fill
+                            fill_w = int(bar_w * player.wire_progress)
+                            if fill_w > 0:
+                                pygame.draw.rect(game_surface, (0, 200, 100), (bar_x, bar_y, fill_w, bar_h), border_radius=4)
+
+                        else:
+                            draw_interaction_prompt(
+                                game_surface, assets["small_font"], 
+                                "Hold SPACE to transfer money", prompt_x, prompt_y,
+                                border_color=(255, 100, 100)
+                            )
                     elif not audit_active:
-                        draw_interaction_prompt(game_surface, assets["small_font"], "Press E to Trade", prompt_x, prompt_y, border_color=(80, 200, 120))
+                        draw_interaction_prompt(
+                            game_surface, assets["small_font"], 
+                            "Press E to Trade", prompt_x, prompt_y,
+                            border_color=(80, 200, 120) 
+                        )
 
+            
             if audit_active:
-                draw_audit_warning(game_surface, assets["hud_font"], player.owed_taxes, GAME_W)
-                if wiring_funds:
-                    wire_bar = pygame.Rect(player.x - 40, player.y - 30, 140, 20)
-                    pygame.draw.rect(game_surface, (40, 40, 40), wire_bar, border_radius=4)
-                    pygame.draw.rect(game_surface, (0, 200, 100), (wire_bar.x, wire_bar.y, 140, 20), border_radius=4)
-                    game_surface.blit(assets["small_font"].render("WIRING...", True, (255,255,255)), (wire_bar.x + 10, wire_bar.y - 25))
-
-                if irs_agent.update(dt, assets):
-                    if keys_pressed[pygame.K_SPACE]:
-                        player.cash -= (player.owed_taxes * 2.5); player.offshore = 0
-                        post_audit_message, irs_agent.speech_text = f"CAUGHT WIRING! SEC FINE: ${(player.owed_taxes * 2.5)/1000000:.1f}M!", "Fraud detected. Issuing 250% SEC fine."
-                    else:
-                        player.cash -= player.owed_taxes
-                        post_audit_message, irs_agent.speech_text = f"IRS TOOK ${player.owed_taxes/1000000:.1f}M. OFFSHORE SAFE.", "Collected taxes. Have a nice day."
-                    player.owed_taxes, irs_agent.state, post_audit_timer, audit_active = 0, "leaving", 4000, False
+                current_tax_bill = player.taxable_profit * player.tax_rate
+                draw_audit_warning(game_surface, assets["hud_font"], current_tax_bill, GAME_W)
+                reached_desk = irs_agent.update(dt, assets)
                 irs_agent.draw(game_surface, assets["small_font"], assets.get("irs_anims"))
+                
+                if reached_desk:
+                    if keys_pressed[pygame.K_SPACE]:
+                        # --- CAUGHT! SEC SEIZES 100% OF THE TOTAL WEEKLY PROFIT ---
+                        sec_fine = player.audit_starting_profit
+                        
+                        # They rip the hidden money back out of your offshore account
+                        player.offshore = max(0, player.offshore - player.hidden_profit)
+                        # They take the remaining unhidden profit from your cash
+                        player.cash -= player.taxable_profit 
+                        
+                        if not hasattr(player, 'trade_history'): player.trade_history = []
+                        if sec_fine > 0:
+                            player.trade_history.append({
+                                "action": "FINE", "ticker": "SEC", 
+                                "shares": 0, "price": 0, 
+                                "total": sec_fine, "pnl": -sec_fine 
+                            })
+
+                        total_left = player.cash + player.offshore
+                        post_audit_message = f"CAUGHT! SEC SEIZED ${sec_fine:,.0f} | LEFT: ${total_left:,.0f}"
+                        irs_agent.speech_text = "Fraud detected. Seizing all capital gains."
+                        
+                    else:
+                        # --- SAFE! IRS ONLY TAXES WHATS LEFT ONSHORE ---
+                        final_tax_bill = player.taxable_profit * player.tax_rate
+                        player.cash -= final_tax_bill
+                        
+                        if not hasattr(player, 'trade_history'): player.trade_history = []
+                        if final_tax_bill > 0:
+                            player.trade_history.append({
+                                "action": "TAX", "ticker": "IRS", 
+                                "shares": 0, "price": 0, 
+                                "total": final_tax_bill, "pnl": -final_tax_bill
+                            })
+                            
+                        if player.hidden_profit > 0:
+                            player.trade_history.append({
+                                "action": "WIRE", "ticker": "OFFSHORE", 
+                                "shares": 0, "price": 0, 
+                                "total": player.hidden_profit, "pnl": -player.hidden_profit 
+                            })
+
+                        total_left = player.cash + player.offshore
+                        post_audit_message = f"TAXED ${final_tax_bill:,.0f} | HIDDEN: ${player.hidden_profit:,.0f} | LEFT: ${total_left:,.0f}"
+                        irs_agent.speech_text = f"Collected taxes. Have a nice day."
+                        
+                    # Reset the pools for next week
+                    player.taxable_profit = 0 
+                    player.hidden_profit = 0
+                    
+                    irs_agent.state = "leaving"
+                    post_audit_timer = 4000
+                    audit_active = False
 
             if post_audit_timer > 0:
                 post_audit_timer -= dt
                 msg_rect = pygame.Rect(GAME_W//2 - 300, GAME_H//2 - 50, 600, 100)
                 pygame.draw.rect(game_surface, (20, 20, 20), msg_rect, border_radius=10)
                 pygame.draw.rect(game_surface, (255, 215, 0), msg_rect, 3, border_radius=10)
-                msg_surf = assets["hud_font"].render(post_audit_message, True, (255, 215, 0))
+                msg_surf = assets["small_font"].render(post_audit_message, True, (255, 215, 0))
                 game_surface.blit(msg_surf, msg_surf.get_rect(center=msg_rect.center))
                 irs_agent.update(dt, assets); irs_agent.draw(game_surface, assets["small_font"], assets.get("irs_anims"))
 
