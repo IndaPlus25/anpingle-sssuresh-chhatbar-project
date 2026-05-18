@@ -846,6 +846,144 @@ def draw_day_night_cycle(game_surface, game_clock, player, computer_rect):
     game_surface.blit(overlay, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
 
 
+def draw_portfolio_screen(game_surface, title_font, body_font, small_font, player, stocks, scroll_y, active_tab="Holdings"):
+    """Draws a live portfolio tracker with Realized/Unrealized P&L and History tabs."""
+    from .constants import GOLD, WHITE, GRAY, GREEN, RED
+    
+    win_w, win_h = 880, 550
+    win_x, win_y = (game_surface.get_width() - win_w) // 2, (game_surface.get_height() - win_h) // 2
+    box = pygame.Rect(win_x, win_y, win_w, win_h)
+    
+    pygame.draw.rect(game_surface, (20, 24, 32), box, border_radius=12)
+    pygame.draw.rect(game_surface, (50, 130, 255), box, 2, border_radius=12)
+    
+    title = body_font.render("📊 Personal Portfolio", True, GOLD)
+    game_surface.blit(title, (box.x + 30, box.y + 20))
+    close_btn = draw_close_button(game_surface, box.right - 50, box.y + 15, small_font)
+
+    stock_dict = {s.name: s for s in stocks}
+    total_stock_value = 0
+    total_initial_cost = 0
+    holdings = []
+    
+    if hasattr(player, 'portfolio'):
+        for ticker, shares in player.portfolio.items():
+            if shares > 0 and ticker in stock_dict:
+                current_price = stock_dict[ticker].price
+                live_value = shares * current_price
+                total_stock_value += live_value
+                avg_cost = player.cost_basis.get(ticker, current_price) if hasattr(player, 'cost_basis') else current_price
+                initial_cost = shares * avg_cost
+                total_initial_cost += initial_cost
+                pnl = live_value - initial_cost
+                pnl_pct = (pnl / initial_cost * 100) if initial_cost > 0 else 0
+                
+                holdings.append({
+                    "ticker": ticker, "shares": shares, "price": current_price, 
+                    "avg_cost": avg_cost, "value": live_value, "pnl": pnl, "pnl_pct": pnl_pct
+                })
+                
+    holdings.sort(key=lambda x: x["value"], reverse=True)
+    net_worth = player.cash + total_stock_value + player.offshore - player.owed_taxes
+
+    total_realized_pnl = 0
+    if hasattr(player, 'trade_history'):
+        for trade in player.trade_history:
+            if trade["action"] == "SELL":
+                total_realized_pnl += trade.get("pnl", 0)
+
+    stats_rect = pygame.Rect(box.x + 30, box.y + 70, win_w - 60, 90)
+    pygame.draw.rect(game_surface, (30, 35, 45), stats_rect, border_radius=8)
+    
+    game_surface.blit(small_font.render("Total Net Worth", True, GRAY), (stats_rect.x + 20, stats_rect.y + 15))
+    nw_sign = "-" if net_worth < 0 else ""
+    game_surface.blit(small_font.render(f"{nw_sign}${abs(net_worth):,.2f}", True, GREEN if net_worth >= 0 else RED), (stats_rect.x + 20, stats_rect.y + 45))
+    
+    global_pnl = total_stock_value - total_initial_cost
+    global_pnl_pct = (global_pnl / total_initial_cost * 100) if total_initial_cost > 0 else 0
+    pnl_color = GREEN if global_pnl >= 0 else RED
+    g_sign = "+" if global_pnl >= 0 else "-"
+    
+    game_surface.blit(small_font.render("Unrealized P&L", True, GRAY), (stats_rect.x + 240, stats_rect.y + 15))
+    game_surface.blit(small_font.render(f"{g_sign}${abs(global_pnl):,.2f} ({g_sign}{abs(global_pnl_pct):.1f}%)", True, pnl_color), (stats_rect.x + 240, stats_rect.y + 45))
+
+    r_sign = "+" if total_realized_pnl >= 0 else "-"
+    r_color = GREEN if total_realized_pnl >= 0 else RED
+    game_surface.blit(small_font.render("Realized P&L", True, GRAY), (stats_rect.x + 480, stats_rect.y + 15))
+    game_surface.blit(small_font.render(f"{r_sign}${abs(total_realized_pnl):,.2f}", True, r_color), (stats_rect.x + 480, stats_rect.y + 45))
+
+    game_surface.blit(small_font.render("Liquid Cash", True, GRAY), (stats_rect.x + 680, stats_rect.y + 15))
+    game_surface.blit(small_font.render(f"${player.cash:,.2f}", True, GOLD), (stats_rect.x + 680, stats_rect.y + 45))
+
+    holdings_btn = pygame.Rect(box.x + 30, box.y + 175, 120, 30)
+    history_btn = pygame.Rect(box.x + 160, box.y + 175, 120, 30)
+
+    h_col = (50, 130, 255) if active_tab == "Holdings" else (40, 45, 60)
+    pygame.draw.rect(game_surface, h_col, holdings_btn, border_radius=6)
+    game_surface.blit(small_font.render("Holdings", True, WHITE), (holdings_btn.x + 25, holdings_btn.y + 6))
+
+    hist_col = (50, 130, 255) if active_tab == "History" else (40, 45, 60)
+    pygame.draw.rect(game_surface, hist_col, history_btn, border_radius=6)
+    game_surface.blit(small_font.render("History", True, WHITE), (history_btn.x + 30, history_btn.y + 6))
+
+    list_rect = pygame.Rect(box.x + 30, box.y + 215, win_w - 60, win_h - 245)
+    game_surface.set_clip(list_rect)
+    row_y = list_rect.y + scroll_y
+    items_count = 0
+
+    if active_tab == "Holdings":
+        if not holdings:
+            empty_text = small_font.render("Your portfolio is empty. Go trade some stocks!", True, GRAY)
+            game_surface.blit(empty_text, empty_text.get_rect(center=list_rect.center))
+        else:
+            items_count = len(holdings)
+            for item in holdings:
+                row_rect = pygame.Rect(box.x + 30, row_y, win_w - 60, 45)
+                if row_rect.bottom > list_rect.top and row_rect.top < list_rect.bottom:
+                    pygame.draw.rect(game_surface, (38, 42, 55), row_rect, border_radius=6)
+                    game_surface.blit(small_font.render(item["ticker"], True, WHITE), (row_rect.x + 15, row_rect.y + 12))
+                    game_surface.blit(small_font.render(f"{item['shares']} shrs @ ${item['avg_cost']:.2f}", True, GRAY), (row_rect.x + 110, row_rect.y + 12))
+                    val_surf = small_font.render(f"Value: ${item['value']:,.2f}", True, WHITE)
+                    game_surface.blit(val_surf, (row_rect.x + 340, row_rect.y + 12))
+                    
+                    item_sign = "+" if item["pnl"] >= 0 else "-"
+                    item_color = GREEN if item["pnl"] >= 0 else RED
+                    pnl_surf = small_font.render(f"{item_sign}${abs(item['pnl']):,.2f} ({item_sign}{abs(item['pnl_pct']):.1f}%)", True, item_color)
+                    game_surface.blit(pnl_surf, (row_rect.right - pnl_surf.get_width() - 15, row_rect.y + 12))
+                row_y += 50
+
+    elif active_tab == "History":
+        history = getattr(player, 'trade_history', [])
+        if not history:
+            empty_text = small_font.render("No trades executed yet.", True, GRAY)
+            game_surface.blit(empty_text, empty_text.get_rect(center=list_rect.center))
+        else:
+            items_count = len(history)
+            for item in reversed(history): 
+                row_rect = pygame.Rect(box.x + 30, row_y, win_w - 60, 45)
+                if row_rect.bottom > list_rect.top and row_rect.top < list_rect.bottom:
+                    pygame.draw.rect(game_surface, (38, 42, 55), row_rect, border_radius=6)
+                    
+                    action_col = GREEN if item["action"] == "BUY" else RED
+                    game_surface.blit(small_font.render(item["action"], True, action_col), (row_rect.x + 15, row_rect.y + 12))
+                    game_surface.blit(small_font.render(item["ticker"], True, WHITE), (row_rect.x + 85, row_rect.y + 12))
+                    game_surface.blit(small_font.render(f"{item['shares']} @ ${item['price']:.2f}", True, GRAY), (row_rect.x + 175, row_rect.y + 12))
+                    
+                    tot_surf = small_font.render(f"Total: ${item['total']:,.2f}", True, WHITE)
+                    game_surface.blit(tot_surf, (row_rect.x + 400, row_rect.y + 12))
+                    
+                    if item["action"] == "SELL":
+                        h_sign = "+" if item["pnl"] >= 0 else "-"
+                        pnl_color = GREEN if item["pnl"] >= 0 else RED
+                        pnl_surf = small_font.render(f"{h_sign}${abs(item['pnl']):,.2f} P&L", True, pnl_color)
+                        game_surface.blit(pnl_surf, (row_rect.right - pnl_surf.get_width() - 15, row_rect.y + 12))
+                row_y += 50
+
+    game_surface.set_clip(None)
+    max_scroll = min(0, list_rect.height - (items_count * 50))
+    return close_btn, max_scroll, holdings_btn, history_btn
+
+
 # ==========================================================
 # SETTINGS SYSTEM
 # ==========================================================
@@ -954,7 +1092,7 @@ def handle_settings_click(buttons, mouse_pos):
         if buttons["controls_close"].collidepoint(mouse_pos):
             _show_controls = False
             return
-        return  # Stop execution so background settings buttons aren't triggered behind the popup
+        return  
 
     if buttons["music_minus"].collidepoint(mouse_pos): _music_volume = max(0.0, _music_volume - 0.1)
     elif buttons["music_plus"].collidepoint(mouse_pos): _music_volume = min(1.0, _music_volume + 0.1)

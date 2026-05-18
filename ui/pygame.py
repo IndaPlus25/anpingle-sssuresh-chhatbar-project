@@ -9,7 +9,8 @@ from .screens import (
     draw_shop_overlay, draw_confirmation_screen, draw_news_screen, draw_news_detail, 
     draw_staff_panel_overlay, draw_accounts_screen, draw_interaction_prompt, 
     draw_settings_overlay, open_settings, close_settings, is_settings_open, 
-    get_music_volume, get_sfx_volume, apply_brightness_overlay, handle_settings_click
+    get_music_volume, get_sfx_volume, apply_brightness_overlay, handle_settings_click,
+    draw_portfolio_screen
 )
 from .assets.stock_assets import (
     CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info
@@ -46,7 +47,7 @@ CANDLE_WIDTH  = 10
 CANDLE_SPACING = 4
 
 # ==========================================
-# AUDIO STATE TRACKING (Fixed UI Asset Subfolder Hierarchy paths)
+# AUDIO STATE TRACKING (Fixed Addresses)
 # ==========================================
 MUSIC_BGM  = "ui/assets/music/prettyjohn1-corporate-background-music_33sec-483404.wav"
 MUSIC_NEWS = "ui/assets/music/sonican-news-music-information-epic-30-seconds-471012.wav"
@@ -208,11 +209,9 @@ def run(game):
     if pygame.mixer.get_init(): pygame.mixer.quit()
     pygame.quit()
     
-    # 1. Initialize custom mixer parameters safely
     pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=1024)
     pygame.init()
     
-    # 2. FORCE lock trigger execution hook for mixer hardware link activation
     pygame.mixer.init()
     pygame.mixer.set_num_channels(32)
 
@@ -251,6 +250,7 @@ def run(game):
     market_open = False
     shop_open = False
     staff_open = False
+    portfolio_open = False
     staff_buttons = []
     buy_buttons = []
     tab_buttons = []
@@ -287,6 +287,13 @@ def run(game):
     card_rects    = []
     accounts_open = False
     accounts_close_btn = pygame.Rect(0,0,0,0)
+    portfolio_close_btn = pygame.Rect(0,0,0,0)
+    port_holdings_btn = pygame.Rect(0,0,0,0)
+    port_history_btn = pygame.Rect(0,0,0,0)
+    repatriate_btn = pygame.Rect(0,0,0,0)
+    portfolio_scroll_y = 0
+    portfolio_max_scroll = 0
+    portfolio_tab = "Holdings"
     hours_until_audit = 168
     placement_mode = False
     placement_item_id = None
@@ -356,6 +363,9 @@ def run(game):
             elif event.type == pygame.MOUSEWHEEL and not is_settings_open():
                 if news_open and not selected_news_item: news.scroll(-event.y * 30)
                 elif shop_open and not confirm_open: shop_scroll_y += event.y * 30
+                elif portfolio_open:
+                    portfolio_scroll_y += event.y * 30 
+                    portfolio_scroll_y = max(portfolio_max_scroll, min(0, portfolio_scroll_y))
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_F12 and state == "game" and not audit_active and not is_settings_open():
@@ -389,6 +399,7 @@ def run(game):
                         elif selected_news_item: selected_news_item = None
                         elif news_open: news_open = False
                         elif accounts_open: accounts_open = False
+                        elif portfolio_open: portfolio_open = False
                         else: open_settings() 
                     elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and placement_mode and not is_settings_open():
                         if check_placement_valid(placement_x, placement_y, placement_item_id, assets, placed_props):
@@ -403,21 +414,25 @@ def run(game):
                         if len(market_amount_text) < 10: market_amount_text += event.unicode
                     elif event.key == pygame.K_TAB and not confirm_open and not is_settings_open():  
                         shop_open = not shop_open
-                        market_open = staff_open = news_open = accounts_open = False
+                        market_open = staff_open = news_open = accounts_open = portfolio_open = False
                     elif event.key == pygame.K_t and not confirm_open and not is_settings_open(): 
                         staff_open = not staff_open
-                        market_open = shop_open = news_open = accounts_open = False
+                        market_open = shop_open = news_open = accounts_open = portfolio_open = False
                     elif event.key == pygame.K_b and not confirm_open and not is_settings_open():
                         accounts_open = not accounts_open
-                        if accounts_open: market_open = shop_open = staff_open = news_open = False
-                    elif event.key == pygame.K_e and not any([market_open, shop_open, news_open, staff_open, accounts_open, is_settings_open()]):
+                        if accounts_open: market_open = shop_open = staff_open = news_open = portfolio_open = False
+                    elif event.key == pygame.K_p and not confirm_open and not is_settings_open():
+                        play(sounds, "click")
+                        portfolio_open = not portfolio_open
+                        if portfolio_open: market_open = shop_open = staff_open = news_open = accounts_open = False
+                    elif event.key == pygame.K_e and not any([market_open, shop_open, news_open, staff_open, accounts_open, portfolio_open, is_settings_open()]):
                         if pygame.Rect(player.x, player.y, 64, 64).colliderect(assets["computer_rect"].inflate(100, 100)):
                             play(sounds, "click")
                             market_open = True
                     elif event.key == pygame.K_n and not confirm_open and not is_settings_open():
                         play(sounds, "click")
                         news_open = not news_open
-                        if news_open: market_open = shop_open = accounts_open = False
+                        if news_open: market_open = shop_open = accounts_open = portfolio_open = False
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 gpt = mouse_clicked_in_game(event)
@@ -461,7 +476,18 @@ def run(game):
                         if menu_btn_rect.collidepoint(gpt):
                             state = "menu"
                             market_open = shop_open = staff_open = False
-                            
+                        if portfolio_open:
+                            if portfolio_close_btn.collidepoint(gpt):
+                                clicked_valid_button = True
+                                portfolio_open = False
+                            if port_holdings_btn.collidepoint(gpt) and portfolio_tab != "Holdings":
+                                clicked_valid_button = True
+                                portfolio_tab = "Holdings"
+                                portfolio_scroll_y = 0
+                            if port_history_btn.collidepoint(gpt) and portfolio_tab != "History":
+                                clicked_valid_button = True
+                                portfolio_tab = "History"
+                                portfolio_scroll_y = 0
                         if market_open:
                             if market_arrow_left.collidepoint(gpt) or market_arrow_right.collidepoint(gpt) or market_close_btn.collidepoint(gpt): clicked_valid_button = True
                             if market_close_btn.collidepoint(gpt): market_open = False
@@ -479,15 +505,38 @@ def run(game):
                                     play(sounds, "buy")
                                     player.cash -= total_cost
                                     if current_stock.name not in player.portfolio: player.portfolio[current_stock.name] = 0
+                                    old_shares = player.portfolio[current_stock.name]
                                     player.portfolio[current_stock.name] += amount
+                                    if not hasattr(player, 'cost_basis'): player.cost_basis = {}
+                                    old_avg = player.cost_basis.get(current_stock.name, current_stock.price)
+                                    total_shares = player.portfolio[current_stock.name]
+                                    new_avg = ((old_shares * old_avg) + (amount * current_stock.price)) / total_shares
+                                    player.cost_basis[current_stock.name] = new_avg
+
+                                    if not hasattr(player, 'trade_history'): player.trade_history = []
+                                    player.trade_history.append({
+                                        "action": "BUY", "ticker": current_stock.name,
+                                        "shares": amount, "price": current_stock.price,
+                                        "total": total_cost, "pnl": 0
+                                    })
                                     market_amount_text = ""
                             if market_sell_btn.collidepoint(gpt) and amount > 0:
                                 owned = player.portfolio.get(current_stock.name, 0)
                                 if owned >= amount:
                                     play(sounds, "buy")
+                                    avg_cost = player.cost_basis.get(current_stock.name, current_stock.price) if hasattr(player, 'cost_basis') else current_stock.price
+                                    realized_pnl = (amount * current_stock.price) - (amount * avg_cost)
+                                    if not hasattr(player, 'trade_history'): player.trade_history = []
+                                    player.trade_history.append({
+                                        "action": "SELL", "ticker": current_stock.name,
+                                        "shares": amount, "price": current_stock.price,
+                                        "total": amount * current_stock.price, "pnl": realized_pnl
+                                    })
                                     player.cash += amount * current_stock.price
                                     player.portfolio[current_stock.name] -= amount
-                                    if player.portfolio[current_stock.name] <= 0: del player.portfolio[current_stock.name]
+                                    if player.portfolio[current_stock.name] <= 0:
+                                        del player.portfolio[current_stock.name]
+                                        if hasattr(player, 'cost_basis') and current_stock.name in player.cost_basis: del player.cost_basis[current_stock.name]
                                     market_amount_text = ""
                         elif shop_open:
                             if shop_close_btn.collidepoint(gpt) or any(t["rect"].collidepoint(gpt) for t in tab_buttons) or any(b[0].collidepoint(gpt) for b in buy_buttons): clicked_valid_button = True
@@ -526,7 +575,7 @@ def run(game):
                                     else: npc.role = "Salesman"
                         if news_btn_rect.collidepoint(gpt):
                             news_open = not news_open
-                            if news_open: market_open = shop_open = accounts_open = False
+                            if news_open: market_open = shop_open = accounts_open = portfolio_open = False
                         if news_open:
                             if selected_news_item:
                                 if close_btn.collidepoint(gpt): clicked_valid_button, selected_news_item = True, None
@@ -603,7 +652,7 @@ def run(game):
             if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
             assets["placed_props"] = placed_props
 
-            if not any([placement_mode, market_open, shop_open, staff_open, accounts_open, confirm_open, wiring_funds, is_settings_open()]):
+            if not any([placement_mode, market_open, shop_open, staff_open, accounts_open, confirm_open, wiring_funds, is_settings_open(), portfolio_open]):
                 anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
                 game_clock.update(dt)
                 game_hour_timer += dt
@@ -632,7 +681,7 @@ def run(game):
             p_rect = draw_player(game_surface, player, anim_frame, assets["all_char_anims"][selected_char], assets["char_images"][selected_char])
             draw_day_night_cycle(game_surface, game_clock, player, assets.get("computer_rect"))
 
-            if not any([placement_mode, market_open, shop_open, accounts_open, news_open, staff_open, is_settings_open()]):
+            if not any([placement_mode, market_open, shop_open, accounts_open, news_open, staff_open, is_settings_open(), portfolio_open]):
                 if p_rect.colliderect(assets["computer_rect"].inflate(100, 100)):
                     prompt_x, prompt_y = assets["computer_rect"].centerx, assets["computer_rect"].top - 10
                     if audit_active and irs_agent.state == "approaching" and player.owed_taxes > 0:
@@ -667,6 +716,8 @@ def run(game):
                 game_surface.blit(msg_surf, msg_surf.get_rect(center=msg_rect.center))
                 irs_agent.update(dt, assets); irs_agent.draw(game_surface, assets["small_font"], assets.get("irs_anims"))
 
+            # --- RENDER OVERLAYSCONTEXT ---
+            if portfolio_open: portfolio_close_btn, portfolio_max_scroll, port_holdings_btn, port_history_btn = draw_portfolio_screen(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player, game.stocks, portfolio_scroll_y, portfolio_tab)
             if market_open: market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input, market_close_btn = draw_market_overlay(game_surface, assets["body_font"], assets["hud_font"], assets["small_font"], game.stocks, selected_stock_idx, player.cash, player.portfolio, market_amount_text, market_input_active, ticker_offset)
             if staff_open: staff_buttons, staff_close_btn = draw_staff_panel_overlay(game_surface, assets["body_font"], assets["small_font"], active_staff, AVAILABLE_EMPLOYEES, assets["staff_portraits"])
             if shop_open: buy_buttons, tab_buttons, shop_scroll_y, shop_close_btn = draw_shop_overlay(game_surface, assets["body_font"], assets["small_font"], player, assets["icon_coin"], assets.get("shop_thumbnails", {}), owned_items, {"Desks": assets.get("current_desk_id"), "Walls": assets.get("current_wall_id")}, shop_tab, shop_scroll_y)
