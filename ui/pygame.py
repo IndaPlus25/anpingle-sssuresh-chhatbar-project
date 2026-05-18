@@ -326,7 +326,7 @@ def run(game):
     buy_buttons = []
     tab_buttons = []
     selected_stock_idx = 0
-    market_arrow_left = market_arrow_right = pygame.Rect(0,0,0,0)
+    market_arrow_left = market_arrow_right = market_close_btn = pygame.Rect(0,0,0,0)
     market_buy_btn = market_sell_btn = market_amount_input = pygame.Rect(0,0,0,0)
     market_amount_text = ""
     market_input_active = False
@@ -640,14 +640,15 @@ def run(game):
                             market_open = shop_open = staff_open = False
                             
                         if market_open:
-                            if market_arrow_left.collidepoint(gpt) or market_arrow_right.collidepoint(gpt):
+                            if market_arrow_left.collidepoint(gpt) or market_arrow_right.collidepoint(gpt) or market_close_btn.collidepoint(gpt):
                                 clicked_valid_button = True
+                            if market_close_btn.collidepoint(gpt):
+                                market_open = False
                             if market_arrow_left.collidepoint(gpt):
                                 selected_stock_idx = (selected_stock_idx - 1) % len(game.stocks)
                             elif market_arrow_right.collidepoint(gpt):
                                 selected_stock_idx = (selected_stock_idx + 1) % len(game.stocks)
 
-                            # --- MOVED FROM SHOP TO MARKET! ---
                             # Amount input field - toggle active state
                             if market_amount_input.collidepoint(gpt):
                                 market_input_active = True
@@ -1077,10 +1078,10 @@ def run(game):
             # UI OVERLAYS
             # =========================
             if market_open:
-                market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input = draw_market_overlay(
+                market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input, market_close_btn = draw_market_overlay(
                     game_surface, assets["body_font"], assets["hud_font"],
                     assets["small_font"], game.stocks, selected_stock_idx,
-                    player.cash, player.portfolio, market_amount_text, market_input_active
+                    player.cash, player.portfolio, market_amount_text, market_input_active, ticker_offset
                 )
                 
             if staff_open:

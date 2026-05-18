@@ -87,15 +87,15 @@ def draw_text_input(game_surface, rect, text, font, placeholder_font, is_active=
 # TEST
 def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
                          selected_stock_idx=0, player_cash=0, player_portfolio=None,
-                         amount_text="", input_active=False):
+                         amount_text="", input_active=False, ticker_offset=0):
     """Draws the Stock Market interaction menu with candlestick charts and pattern info.
-
-    Returns (left_arrow_rect, right_arrow_rect, buy_btn, sell_btn, amount_input_rect) for click-based stock navigation and trading.
+    Returns (left_arrow_rect, right_arrow_rect, buy_btn, sell_btn, amount_input_rect, close_btn).
     """
     from .constants import BLUE, GOLD, GREEN, GRAY, RED, WHITE, DARK
     from .assets.stock_assets import CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info, PATTERN_COLORS
 
-    BOX_W, BOX_H = 1020, 520
+    # Increased box height to 600 for plenty of room
+    BOX_W, BOX_H = 1020, 600 
     box_x = (game_surface.get_width()  - BOX_W) // 2
     box_y = (game_surface.get_height() - BOX_H) // 2
     box   = pygame.Rect(box_x, box_y, BOX_W, BOX_H)
@@ -108,8 +108,9 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
     pygame.draw.rect(game_surface, BLUE, box, 2, border_radius=14)
 
     game_surface.blit(body_font.render("STOCK MARKET", True, GOLD), (box.x + 30, box.y + 16))
-    close_hint = small_font.render("Press Q to close  |  ← → to switch stocks", True, GRAY)
-    game_surface.blit(close_hint, (box.x + BOX_W - close_hint.get_width() - 20, box.y + 22))
+    
+    # --- NEW: Draw the professional Close Button instead of text hints ---
+    close_btn = draw_close_button(game_surface, box.right - 50, box.y + 12, small_font)
 
     strip_y = box.y + 55
     strip_h = 38
@@ -203,7 +204,7 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
             pygame.draw.rect(game_surface, pcolor, badge_rect, border_radius=4)
             game_surface.blit(small_font.render(f"  {display_name}", True, WHITE), (badge_rect.x + 4, badge_rect.y + 4))
             game_surface.blit(small_font.render(category, True, GRAY), (left_x + 270, pattern_y + 4))
-            bar_x, bar_w, bar_h, bar_y_pos = left_x + 420, 200, 14, pattern_y + 6
+            bar_x, bar_w, bar_h, bar_y_pos = left_x + 500, 200, 14, pattern_y + 6
             pygame.draw.rect(game_surface, PATTERN_PROGRESS_BG, (bar_x, bar_y_pos, bar_w, bar_h), border_radius=3)
             pygame.draw.rect(game_surface, (80, 80, 100),       (bar_x, bar_y_pos, bar_w, bar_h), 1, border_radius=3)
             total_ticks = getattr(stock, '_pattern_total_ticks', 20)
@@ -219,12 +220,9 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
     # ----------------------------------------------------------------
     # Trading panel (buy/sell)
     # ----------------------------------------------------------------
-    trade_y = pattern_y + 50
+    trade_y = pattern_y + 55 
 
-    # Portfolio info
-    owned_qty = 0
-    if player_portfolio and stock.name in player_portfolio:
-        owned_qty = player_portfolio[stock.name]
+    owned_qty = player_portfolio.get(stock.name, 0) if player_portfolio else 0
 
     portfolio_text = f"Owned: {owned_qty} shares"
     portfolio_surf = small_font.render(portfolio_text, True, (180, 180, 200))
@@ -232,29 +230,41 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
 
     cash_text = f"Cash: ${player_cash:,.0f}"
     cash_surf = small_font.render(cash_text, True, GOLD)
-    game_surface.blit(cash_surf, (left_x + 200, trade_y))
+    game_surface.blit(cash_surf, (left_x + 220, trade_y)) 
 
-    # Amount input field - position it to fit within bounds
-    input_x = left_x + 380
-    input_y = pattern_y + 42
-    input_w, input_h = 140, 34
+    # --- NEW: Much larger input box ---
+    input_x = left_x + 480
+    input_y = pattern_y + 44 
+    input_w, input_h = 180, 42 
     amount_input_rect = pygame.Rect(input_x, input_y, input_w, input_h)
-    draw_text_input(game_surface, amount_input_rect, amount_text, small_font, small_font, input_active)
+    
+    try:
+        from features.interaction import draw_text_input
+        draw_text_input(game_surface, amount_input_rect, amount_text, small_font, small_font, input_active)
+    except:
+        pygame.draw.rect(game_surface, (30, 35, 50), amount_input_rect, border_radius=6)
+        if input_active: pygame.draw.rect(game_surface, GOLD, amount_input_rect, 2, border_radius=6)
+        else: pygame.draw.rect(game_surface, (60, 70, 90), amount_input_rect, 1, border_radius=6)
+        
+        display_txt = amount_text if amount_text else "Enter amount..."
+        txt_color = WHITE if amount_text else GRAY
+        txt_surf = small_font.render(display_txt, True, txt_color)
+        game_surface.blit(txt_surf, (amount_input_rect.x + 12, amount_input_rect.y + 10))
 
-    # Buy/Sell buttons - aligned to bottom of input box
-    btn_w, btn_h = 90, 32
-    btn_y = input_y + input_h - btn_h  # Align bottom with input box
+    # Buy/Sell buttons aligned
+    btn_w, btn_h = 90, 36
+    btn_y = input_y + (input_h - btn_h) // 2  
 
-    buy_btn = pygame.Rect(input_x + input_w + 12, btn_y, btn_w, btn_h)
-    buy_color = (30, 140, 80)  # Green
+    buy_btn = pygame.Rect(input_x + input_w + 15, btn_y, btn_w, btn_h)
+    buy_color = (30, 140, 80)  
     if player_cash < stock.price or not amount_text:
-        buy_color = (60, 80, 60)  # Dimmed green if can't afford
+        buy_color = (60, 80, 60)  
     draw_button(game_surface, buy_btn, "BUY", small_font, color=buy_color, radius=6)
 
     sell_btn = pygame.Rect(buy_btn.right + 10, btn_y, btn_w, btn_h)
-    sell_color = (180, 60, 60)  # Red
+    sell_color = (180, 60, 60)  
     if owned_qty <= 0 or not amount_text:
-        sell_color = (80, 60, 60)  # Dimmed red if can't sell
+        sell_color = (80, 60, 60)  
     draw_button(game_surface, sell_btn, "SELL", small_font, color=sell_color, radius=6)
 
     # ----------------------------------------------------------------
@@ -262,14 +272,24 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
     # ----------------------------------------------------------------
     ticker_y = box.y + BOX_H - 36
     pygame.draw.line(game_surface, (40, 44, 65), (box.x + 10, ticker_y - 4), (box.x + BOX_W - 10, ticker_y - 4), 1)
-    tx = box.x + 20
-    for s in stocks:
-        col   = GREEN if (s.candles and s.price >= s.candles[-1].close) else RED if s.candles else GRAY
-        label = small_font.render(f"{s.name} ${s.price:.2f}", True, col)
-        game_surface.blit(label, (tx, ticker_y))
-        tx += label.get_width() + 20
+    
+    ticker_clip = pygame.Rect(box.x + 10, ticker_y - 5, BOX_W - 20, 40)
+    game_surface.set_clip(ticker_clip)
 
-    return left_arrow_rect, right_arrow_rect, buy_btn, sell_btn, amount_input_rect
+    # Start drawing at the animated offset!
+    tx = box.x + 20 + ticker_offset
+    
+    # Draw the list of stocks TWICE so that it wraps around seamlessly
+    for loop in range(2): 
+        for s in stocks:
+            col   = GREEN if (s.candles and s.price >= s.candles[-1].close) else RED if s.candles else GRAY
+            label = small_font.render(f"{s.name} ${s.price:.2f}", True, col)
+            game_surface.blit(label, (tx, ticker_y))
+            tx += label.get_width() + 30
+
+    game_surface.set_clip(None)
+
+    return left_arrow_rect, right_arrow_rect, buy_btn, sell_btn, amount_input_rect, close_btn
 
 
 def draw_shop_overlay(game_surface, body_font, small_font, player, icon_coin, thumbnails, owned_items, equipped_items, shop_tab, scroll_y):
