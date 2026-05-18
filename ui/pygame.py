@@ -327,6 +327,9 @@ def run(game):
     tab_buttons = []
     selected_stock_idx = 0
     market_arrow_left = market_arrow_right = pygame.Rect(0,0,0,0)
+    market_buy_btn = market_sell_btn = market_amount_input = pygame.Rect(0,0,0,0)
+    market_amount_text = ""
+    market_input_active = False
     
     shop_tab = "Desks"
     shop_scroll_y = 0
@@ -532,6 +535,15 @@ def run(game):
                         selected_stock_idx = (selected_stock_idx - 1) % len(game.stocks)
                     elif market_open and event.key == pygame.K_RIGHT:
                         selected_stock_idx = (selected_stock_idx + 1) % len(game.stocks)
+
+                    # =========================
+                    # MARKET AMOUNT INPUT
+                    # =========================
+                    elif market_open and event.key == pygame.K_BACKSPACE:
+                        market_amount_text = market_amount_text[:-1]
+                    elif market_open and event.unicode.isdigit():
+                        if len(market_amount_text) < 10:
+                            market_amount_text += event.unicode
                     elif event.key == pygame.K_TAB and not confirm_open:  
                         shop_open = not shop_open
                         market_open = staff_open = False
@@ -638,6 +650,38 @@ def run(game):
                         elif shop_open:
                             if shop_close_btn.collidepoint(gpt) or any(t["rect"].collidepoint(gpt) for t in tab_buttons) or any(b[0].collidepoint(gpt) for b in buy_buttons):
                                 clicked_valid_button = True
+                            # Amount input field - toggle active state
+                            if market_amount_input.collidepoint(gpt):
+                                market_input_active = True
+                            else:
+                                market_input_active = False
+
+                            # Buy/Sell buttons
+                            current_stock = game.stocks[selected_stock_idx]
+                            try:
+                                amount = int(market_amount_text) if market_amount_text else 0
+                            except ValueError:
+                                amount = 0
+
+                            if market_buy_btn.collidepoint(gpt) and amount > 0:
+                                total_cost = amount * current_stock.price
+                                if player.cash >= total_cost and amount > 0:
+                                    player.cash -= total_cost
+                                    if current_stock.name not in player.portfolio:
+                                        player.portfolio[current_stock.name] = 0
+                                    player.portfolio[current_stock.name] += amount
+                                    market_amount_text = ""
+
+                            if market_sell_btn.collidepoint(gpt) and amount > 0:
+                                owned = player.portfolio.get(current_stock.name, 0)
+                                if owned >= amount:
+                                    player.cash += amount * current_stock.price
+                                    player.portfolio[current_stock.name] -= amount
+                                    if player.portfolio[current_stock.name] <= 0:
+                                        del player.portfolio[current_stock.name]
+                                    market_amount_text = ""
+
+                        if shop_open:
                             if shop_close_btn.collidepoint(gpt):
                                 shop_open = False
                             for tab in tab_buttons:
@@ -1018,9 +1062,10 @@ def run(game):
             # UI OVERLAYS
             # =========================
             if market_open:
-                market_arrow_left, market_arrow_right = draw_market_overlay(
+                market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input = draw_market_overlay(
                     game_surface, assets["body_font"], assets["hud_font"],
-                    assets["small_font"], game.stocks, selected_stock_idx
+                    assets["small_font"], game.stocks, selected_stock_idx,
+                    player.cash, player.portfolio, market_amount_text, market_input_active
                 )
                 
             if staff_open:
