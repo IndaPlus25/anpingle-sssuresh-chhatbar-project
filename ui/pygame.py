@@ -268,7 +268,7 @@ def run(game):
     tab_buttons = []
     selected_stock_idx = 0
     market_arrow_left = market_arrow_right = market_close_btn = pygame.Rect(0,0,0,0)
-    market_buy_btn = market_sell_btn = market_amount_input = pygame.Rect(0,0,0,0)
+    market_buy_btn = market_short_btn = market_amount_input = pygame.Rect(0,0,0,0)
     market_amount_text = ""
     market_input_active = False
     
@@ -572,6 +572,28 @@ def run(game):
                                         del player.portfolio[current_stock.name]
                                         if hasattr(player, 'cost_basis') and current_stock.name in player.cost_basis: del player.cost_basis[current_stock.name]
                                     market_amount_text = ""
+                            # Amount input field - toggle active state
+                            if market_amount_input.collidepoint(gpt):
+                                market_input_active = True
+                            else:
+                                market_input_active = False
+
+                            # Buy/Short buttons
+                            current_stock = game.stocks[selected_stock_idx]
+                            try:
+                                amount = int(market_amount_text) if market_amount_text else 0
+                            except ValueError:
+                                amount = 0
+
+                            if market_buy_btn.collidepoint(gpt) and amount > 0:
+                                if player.buy_stock(current_stock.name, current_stock.price, amount):
+                                    play(sounds, "buy")
+                                    market_amount_text = ""
+
+                            if market_short_btn.collidepoint(gpt) and amount > 0:
+                                play(sounds, "buy")
+                                player.short_stock(current_stock.name, current_stock.price, amount)
+                                market_amount_text = ""
                         elif shop_open:
                             if shop_close_btn.collidepoint(gpt) or any(t["rect"].collidepoint(gpt) for t in tab_buttons) or any(b[0].collidepoint(gpt) for b in buy_buttons): clicked_valid_button = True
                             if shop_close_btn.collidepoint(gpt): shop_open = False
@@ -648,6 +670,8 @@ def run(game):
             if pygame.time.get_ticks() - last_update > 1000:
                 stock_prev_prices = {stock.name: stock.price for stock in game.stocks}
                 game.update_stocks()
+                player.settle_shorts(game.stocks, stock_prev_prices)
+
                 last_update = pygame.time.get_ticks()
 
             current_time = pygame.time.get_ticks()
@@ -901,7 +925,49 @@ def run(game):
                 pygame.draw.rect(game_surface, (255, 215, 0), msg_rect, 3, border_radius=10)
                 msg_surf = assets["small_font"].render(post_audit_message, True, (255, 215, 0))
                 game_surface.blit(msg_surf, msg_surf.get_rect(center=msg_rect.center))
-                irs_agent.update(dt, assets); irs_agent.draw(game_surface, assets["small_font"], assets.get("irs_anims"))
+                irs_agent.update(dt, assets) 
+                irs_agent.draw(game_surface, assets["small_font"], assets.get("irs_anims"))
+
+
+            # =========================
+            # UI OVERLAYS
+            # =========================
+            if market_open:
+                market_arrow_left, market_arrow_right, market_buy_btn, market_short_btn, market_amount_input, market_close_btn = draw_market_overlay(
+                    game_surface, assets["body_font"], assets["hud_font"],
+                    assets["small_font"], game.stocks, selected_stock_idx,
+                    player.cash, player.portfolio, player.shorts,
+                    market_amount_text, market_input_active, ticker_offset
+                )
+                
+            if staff_open:
+                staff_buttons, staff_close_btn = draw_staff_panel_overlay(
+                    game_surface, assets["body_font"], assets["small_font"], 
+                    active_staff, AVAILABLE_EMPLOYEES, assets["staff_portraits"]
+                )
+                
+            if shop_open:
+                equipped_items = {
+                    "Desks": assets.get("current_desk_id"),
+                    "Walls": assets.get("current_wall_id"),
+                }
+                buy_buttons, tab_buttons, shop_scroll_y, shop_close_btn = draw_shop_overlay(
+                    game_surface, assets["body_font"], assets["small_font"], player,
+                    assets["icon_coin"], assets.get("shop_thumbnails", {}),
+                    owned_items, equipped_items, shop_tab, shop_scroll_y
+                )
+            
+
+            if accounts_open:
+                accounts_close_btn, repatriate_btn = draw_accounts_screen(
+                    game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player
+                )
+                                  
+            if confirm_open and pending_item:
+                yes_btn, no_btn = draw_confirmation_screen(
+                    game_surface, assets["body_font"], assets["small_font"],
+                    f"Buy {pending_item['name']}?"
+                )
 
             if portfolio_open: portfolio_close_btn, portfolio_max_scroll, port_holdings_btn, port_history_btn = draw_portfolio_screen(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player, game.stocks, portfolio_scroll_y, portfolio_tab)
             if market_open: market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input, market_close_btn = draw_market_overlay(game_surface, assets["body_font"], assets["hud_font"], assets["small_font"], game.stocks, selected_stock_idx, player.cash, player.portfolio, market_amount_text, market_input_active, ticker_offset)

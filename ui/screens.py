@@ -85,8 +85,11 @@ def draw_text_input(game_surface, rect, text, font, placeholder_font, is_active=
 
 def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
                          selected_stock_idx=0, player_cash=0, player_portfolio=None,
+                         player_shorts=None,
                          amount_text="", input_active=False, ticker_offset=0):
-    """Draws the Stock Market interaction menu with candlestick charts and pattern info."""
+    """Draws the Stock Market interaction menu with candlestick charts and pattern info.
+    Returns (left_arrow_rect, right_arrow_rect, buy_btn, short_btn, amount_input_rect, close_btn).
+    """
     from .constants import BLUE, GOLD, GREEN, GRAY, RED, WHITE, DARK
     from .assets.stock_assets import CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info
 
@@ -210,12 +213,26 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
     else:
         game_surface.blit(small_font.render("No active pattern — market is drifting", True, GRAY), (left_x, pattern_y + 4))
 
+    # ----------------------------------------------------------------
+    # Trading panel (buy/short)
+    # ----------------------------------------------------------------
     trade_y = pattern_y + 55 
     owned_qty = player_portfolio.get(stock.name, 0) if player_portfolio else 0
+    short_info = player_shorts.get(stock.name) if player_shorts else None
+    short_qty = short_info["qty"] if short_info else 0
 
     portfolio_text = f"Owned: {owned_qty} shares"
     portfolio_surf = small_font.render(portfolio_text, True, (180, 180, 200))
     game_surface.blit(portfolio_surf, (left_x, trade_y))
+
+    # Show short position info next to owned shares
+    if short_qty > 0:
+        entry_price = short_info["entry_price"]
+        pnl = (entry_price - stock.price) * short_qty
+        pnl_color = GREEN if pnl >= 0 else RED
+        short_text = f"Short: {short_qty} @ ${entry_price:.2f}  P/L: ${pnl:+,.0f}"
+        short_surf = small_font.render(short_text, True, pnl_color)
+        game_surface.blit(short_surf, (left_x, trade_y + 18))
 
     cash_text = f"Cash: ${player_cash:,.0f}"
     cash_surf = small_font.render(cash_text, True, GOLD)
@@ -239,6 +256,7 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
         txt_surf = small_font.render(display_txt, True, txt_color)
         game_surface.blit(txt_surf, (amount_input_rect.x + 12, amount_input_rect.y + 10))
 
+    # Buy/Short buttons aligned
     btn_w, btn_h = 90, 36
     btn_y = input_y + (input_h - btn_h) // 2  
 
@@ -248,11 +266,11 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
         buy_color = (60, 80, 60)  
     draw_button(game_surface, buy_btn, "BUY", small_font, color=buy_color, radius=6)
 
-    sell_btn = pygame.Rect(buy_btn.right + 10, btn_y, btn_w, btn_h)
-    sell_color = (180, 60, 60)  
-    if owned_qty <= 0 or not amount_text:
-        sell_color = (80, 60, 60)  
-    draw_button(game_surface, sell_btn, "SELL", small_font, color=sell_color, radius=6)
+    short_btn = pygame.Rect(buy_btn.right + 10, btn_y, btn_w, btn_h)
+    short_color = (180, 60, 60)  
+    if not amount_text:
+        short_color = (80, 60, 60)  
+    draw_button(game_surface, short_btn, "SHORT", small_font, color=short_color, radius=6)
 
     ticker_y = box.y + BOX_H - 36
     pygame.draw.line(game_surface, (40, 44, 65), (box.x + 10, ticker_y - 4), (box.x + BOX_W - 10, ticker_y - 4), 1)
@@ -269,7 +287,9 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
             tx += label.get_width() + 30
 
     game_surface.set_clip(None)
-    return left_arrow_rect, right_arrow_rect, buy_btn, sell_btn, amount_input_rect, close_btn
+
+    return left_arrow_rect, right_arrow_rect, buy_btn, short_btn, amount_input_rect, close_btn
+
 
 
 def draw_shop_overlay(game_surface, body_font, small_font, player, icon_coin, thumbnails, owned_items, equipped_items, shop_tab, scroll_y):
