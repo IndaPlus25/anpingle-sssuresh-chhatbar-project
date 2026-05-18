@@ -261,7 +261,6 @@ def run(game):
     pygame.mixer.pre_init(buffer=1024)
     pygame.init()
 
-
     try:
         pygame.mixer.init()
         pygame.mixer.set_num_channels(16)
