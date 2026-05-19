@@ -527,21 +527,29 @@ def run(game):
                             market_input_active = True if market_amount_input.collidepoint(gpt) else False
 
                             current_stock = game.stocks[selected_stock_idx]
-                            amount = int(market_amount_text) if market_amount_text else 0
+                            try:
+                                amount = int(market_amount_text) if market_amount_text else 0
+                            except ValueError:
+                                amount = 0
+
                             if not hasattr(player, 'portfolio'): player.portfolio = {}
+
+                            if market_amount_input.collidepoint(gpt):
+                                market_input_active = True
+                            else:
+                                market_input_active = False
 
                             if market_buy_btn.collidepoint(gpt) and amount > 0:
                                 total_cost = amount * current_stock.price
-                                if player.cash >= total_cost:
+                                if player.buy_stock(current_stock.name, current_stock.price, amount):
                                     play(sounds, "buy")
-                                    player.cash -= total_cost
-                                    if current_stock.name not in player.portfolio: player.portfolio[current_stock.name] = 0
-                                    old_shares = player.portfolio[current_stock.name]
-                                    player.portfolio[current_stock.name] += amount
+                                    
+                                    # Update cost basis for IRS logic
                                     if not hasattr(player, 'cost_basis'): player.cost_basis = {}
+                                    old_shares = player.portfolio[current_stock.name] - amount
                                     old_avg = player.cost_basis.get(current_stock.name, current_stock.price)
                                     total_shares = player.portfolio[current_stock.name]
-                                    new_avg = ((old_shares * old_avg) + (amount * current_stock.price)) / total_shares
+                                    new_avg = ((old_shares * old_avg) + (amount * current_stock.price)) / total_shares if total_shares > 0 else 0
                                     player.cost_basis[current_stock.name] = new_avg
 
                                     if not hasattr(player, 'trade_history'): player.trade_history = []
@@ -551,48 +559,16 @@ def run(game):
                                         "total": total_cost, "pnl": 0
                                     })
                                     market_amount_text = ""
-                            if market_sell_btn.collidepoint(gpt) and amount > 0:
-                                owned = player.portfolio.get(current_stock.name, 0)
-                                if owned >= amount:
-                                    play(sounds, "buy")
-                                    avg_cost = player.cost_basis.get(current_stock.name, current_stock.price) if hasattr(player, 'cost_basis') else current_stock.price
-                                    realized_pnl = (amount * current_stock.price) - (amount * avg_cost)
-                                    if not hasattr(player, 'taxable_profit'): player.taxable_profit = 0
-                                    player.taxable_profit += realized_pnl
-                                    if not hasattr(player, 'trade_history'):
-                                        player.trade_history = []
-                                    player.trade_history.append({
-                                        "action": "SELL", "ticker": current_stock.name,
-                                        "shares": amount, "price": current_stock.price,
-                                        "total": amount * current_stock.price, "pnl": realized_pnl
-                                    })
-                                    player.cash += amount * current_stock.price
-                                    player.portfolio[current_stock.name] -= amount
-                                    if player.portfolio[current_stock.name] <= 0:
-                                        del player.portfolio[current_stock.name]
-                                        if hasattr(player, 'cost_basis') and current_stock.name in player.cost_basis: del player.cost_basis[current_stock.name]
-                                    market_amount_text = ""
-                            # Amount input field - toggle active state
-                            if market_amount_input.collidepoint(gpt):
-                                market_input_active = True
-                            else:
-                                market_input_active = False
-
-                            # Buy/Short buttons
-                            current_stock = game.stocks[selected_stock_idx]
-                            try:
-                                amount = int(market_amount_text) if market_amount_text else 0
-                            except ValueError:
-                                amount = 0
-
-                            if market_buy_btn.collidepoint(gpt) and amount > 0:
-                                if player.buy_stock(current_stock.name, current_stock.price, amount):
-                                    play(sounds, "buy")
-                                    market_amount_text = ""
 
                             if market_short_btn.collidepoint(gpt) and amount > 0:
                                 play(sounds, "buy")
                                 player.short_stock(current_stock.name, current_stock.price, amount)
+                                if not hasattr(player, 'trade_history'): player.trade_history = []
+                                player.trade_history.append({
+                                    "action": "SHORT", "ticker": current_stock.name,
+                                    "shares": amount, "price": current_stock.price,
+                                    "total": amount * current_stock.price, "pnl": 0
+                                })
                                 market_amount_text = ""
                         elif shop_open:
                             if shop_close_btn.collidepoint(gpt) or any(t["rect"].collidepoint(gpt) for t in tab_buttons) or any(b[0].collidepoint(gpt) for b in buy_buttons): clicked_valid_button = True
@@ -969,12 +945,8 @@ def run(game):
                     f"Buy {pending_item['name']}?"
                 )
 
-            if portfolio_open: portfolio_close_btn, portfolio_max_scroll, port_holdings_btn, port_history_btn = draw_portfolio_screen(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player, game.stocks, portfolio_scroll_y, portfolio_tab)
-            if market_open: market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input, market_close_btn = draw_market_overlay(game_surface, assets["body_font"], assets["hud_font"], assets["small_font"], game.stocks, selected_stock_idx, player.cash, player.portfolio, market_amount_text, market_input_active, ticker_offset)
-            if staff_open: staff_buttons, staff_close_btn = draw_staff_panel_overlay(game_surface, assets["body_font"], assets["small_font"], active_staff, AVAILABLE_EMPLOYEES, assets["staff_portraits"])
-            if shop_open: buy_buttons, tab_buttons, shop_scroll_y, shop_close_btn = draw_shop_overlay(game_surface, assets["body_font"], assets["small_font"], player, assets["icon_coin"], assets.get("shop_thumbnails", {}), owned_items, {"Desks": assets.get("current_desk_id"), "Walls": assets.get("current_wall_id")}, shop_tab, shop_scroll_y)
-            if accounts_open: accounts_close_btn, repatriate_btn = draw_accounts_screen(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player)
-            if confirm_open and pending_item: yes_btn, no_btn = draw_confirmation_screen(game_surface, assets["body_font"], assets["small_font"], f"Buy {pending_item['name']}?")
+            if portfolio_open: 
+                portfolio_close_btn, portfolio_max_scroll, port_holdings_btn, port_history_btn = draw_portfolio_screen(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player, game.stocks, portfolio_scroll_y, portfolio_tab)
             if news_open:
                 back_btn, card_rects = draw_news_screen(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], news.news_items, news.scroll_offset, game_clock)
                 if selected_news_item: close_btn = draw_news_detail(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], selected_news_item, game_clock)
