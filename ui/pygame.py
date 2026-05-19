@@ -682,7 +682,7 @@ def run(game):
                 news_interval = random.randint(10000, 30000)
 
             game_surface.blit(assets["bg"], (0, 0))
-            draw_button(game_surface, news_btn_rect, "📰 News", assets["small_font"], color=(40, 80, 120))
+            draw_button(game_surface, news_btn_rect, "News", assets["small_font"], color=(40, 80, 120))
 
             for stock in game.stocks:
                 if not stock.is_pattern_active() and random.random() < PATTERN_INJECT_CHANCE:
@@ -740,7 +740,13 @@ def run(game):
                 game.stocks, stock_prev_prices
             )
 
-            draw_button(game_surface, news_btn_rect, "📰 News", assets["small_font"], color=(40, 80, 120))
+            hm_x, hm_y = menu_btn_rect.right - 33, menu_btn_rect.y + 11
+            pygame.draw.line(game_surface, (255, 255, 255), (hm_x, hm_y), (hm_x + 20, hm_y), 3)
+            pygame.draw.line(game_surface, (255, 255, 255), (hm_x, hm_y + 7), (hm_x + 20, hm_y + 7), 3)
+            pygame.draw.line(game_surface, (255, 255, 255), (hm_x, hm_y + 14), (hm_x + 20, hm_y + 14), 3)
+
+
+            draw_button(game_surface, news_btn_rect, "News", assets["small_font"], color=(40, 80, 120))
 
             ticker_offset -= 1.5
             if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
