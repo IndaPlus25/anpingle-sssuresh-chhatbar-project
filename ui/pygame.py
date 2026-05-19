@@ -695,10 +695,12 @@ def run(game):
                                                 placed_props = data["shop"].get("placed_props", [])
                                                 assets["current_desk_id"] = data["shop"].get("equipped_desk")
                                                 assets["current_wall_id"] = data["shop"].get("equipped_wall")
-                                                from features.npc import EmployeeNPC
                                                 active_staff.clear()
                                                 for s in data.get("staff", []):
-                                                    emp = EmployeeNPC(GAME_W//2, GAME_H//2, s["config"])
+                                                    spawn_x = s.get("x", random.randint(200, GAME_W - 200))
+                                                    spawn_y = s.get("y", random.randint(200, GAME_H - 200))
+                                                    
+                                                    emp = EmployeeNPC(spawn_x, spawn_y, s["config"])
                                                     emp.energy = s.get("energy", 100)
                                                     emp.role = s.get("role", "Salesman")
                                                     active_staff[s["id"]] = emp
