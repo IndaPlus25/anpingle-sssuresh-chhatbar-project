@@ -8,10 +8,10 @@ def draw_menu(game_surface, title_font, body_font, small_font, icon_play, icon_p
         pygame.draw.line(game_surface, (30, 30, 55), (x, 0), (x, GAME_H))
     for y in range(0, GAME_H, 40): 
         pygame.draw.line(game_surface, (30, 30, 55), (0, y), (GAME_W, y))
-    title = title_font.render("HEDGE FUND", True, GOLD)
-    sub   = body_font.render("The Game", True, LGRAY)
+    title = title_font.render("Pixel Broker", True, GOLD)
+    # sub   = body_font.render("The Game", True, LGRAY)
     game_surface.blit(title, title.get_rect(centerx=GAME_W // 2, y=120))
-    game_surface.blit(sub,   sub.get_rect(centerx=GAME_W // 2,   y=200))
+    # game_surface.blit(sub,   sub.get_rect(centerx=GAME_W // 2,   y=200))
     pygame.draw.line(game_surface, GOLD, (460, 240), (820, 240), 2)
     start_btn = pygame.Rect(490, 280, 300, 60)
     char_btn  = pygame.Rect(490, 360, 300, 60)

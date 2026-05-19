@@ -1,6 +1,6 @@
 # anpingle-sssuresh-chhatbar-project
 
-# 📊 Hedge Fund: The Game
+# 📊 Pixel Broker
 
 A real-time, fast-paced single-player corporate simulation game built in Python using **Pygame**. Step into the shoes of an ambitious fund manager juggling live market trading context, candlestick technical analysis patterns, office customization, employee recruitment, and tax-evading offshore wire maneuvers—all while avoiding catastrophic audits from the IRS.
 
