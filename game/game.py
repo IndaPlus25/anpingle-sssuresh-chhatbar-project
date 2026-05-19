@@ -1,5 +1,5 @@
 from .player import Player
-from .stock import Stock
+from .stocks.stock import Stock
 
 class Game:
     def __init__(self):
@@ -9,6 +9,12 @@ class Game:
             Stock("TSLA", 85),
             Stock("FAILS", 205),
             Stock("ASML", 47),
+            Stock("AAPL", 150),
+            Stock("MSFT", 310),
+            Stock("GOOGL", 2800),
+            Stock("NVDA", 950),
+            Stock("META", 480),
+            Stock("NFLX", 620),
         ]
 
     def add_player(self, name):
