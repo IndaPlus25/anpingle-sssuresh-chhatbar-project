@@ -263,6 +263,7 @@ def run(game):
     shop_open = False
     staff_open = False
     portfolio_open = False
+    portfolio_close_buttons = []
     staff_buttons = []
     buy_buttons = []
     tab_buttons = []
@@ -519,6 +520,33 @@ def run(game):
                                 clicked_valid_button = True
                                 portfolio_tab = "History"
                                 portfolio_scroll_y = 0
+                            # Close position buttons
+                            stock_dict = {s.name: s for s in game.stocks}
+                            for btn_rect, ticker, pos_type in portfolio_close_buttons:
+                                if btn_rect.collidepoint(gpt) and ticker in stock_dict:
+                                    clicked_valid_button = True
+                                    current_price = stock_dict[ticker].price
+                                    if pos_type == "LONG":
+                                        shares, pnl = player.close_long_position(ticker, current_price)
+                                        if shares > 0:
+                                            play(sounds, "buy")
+                                            if not hasattr(player, 'trade_history'): player.trade_history = []
+                                            player.trade_history.append({
+                                                "action": "SELL", "ticker": ticker,
+                                                "shares": shares, "price": current_price,
+                                                "total": shares * current_price, "pnl": pnl
+                                            })
+                                    elif pos_type == "SHORT":
+                                        qty, pnl = player.close_short_position(ticker, current_price)
+                                        if qty > 0:
+                                            play(sounds, "buy")
+                                            if not hasattr(player, 'trade_history'): player.trade_history = []
+                                            player.trade_history.append({
+                                                "action": "COVER", "ticker": ticker,
+                                                "shares": qty, "price": current_price,
+                                                "total": qty * current_price, "pnl": pnl
+                                            })
+                                    break  # Only close one position per click
                         if market_open:
                             if market_arrow_left.collidepoint(gpt) or market_arrow_right.collidepoint(gpt) or market_close_btn.collidepoint(gpt): clicked_valid_button = True
                             if market_close_btn.collidepoint(gpt): market_open = False
@@ -946,7 +974,7 @@ def run(game):
                 )
 
             if portfolio_open: 
-                portfolio_close_btn, portfolio_max_scroll, port_holdings_btn, port_history_btn = draw_portfolio_screen(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player, game.stocks, portfolio_scroll_y, portfolio_tab)
+                portfolio_close_btn, portfolio_max_scroll, port_holdings_btn, port_history_btn, portfolio_close_buttons = draw_portfolio_screen(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player, game.stocks, portfolio_scroll_y, portfolio_tab)
             if news_open:
                 back_btn, card_rects = draw_news_screen(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], news.news_items, news.scroll_offset, game_clock)
                 if selected_news_item: close_btn = draw_news_detail(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], selected_news_item, game_clock)

@@ -871,7 +871,8 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
     """Draws a live portfolio tracker with Realized/Unrealized P&L and History tabs."""
     from .constants import GOLD, WHITE, GRAY, GREEN, RED
     
-    win_w, win_h = 880, 550
+    close_buttons = []  # list of (rect, ticker, type) for close position buttons
+    win_w, win_h = 920, 550
     win_x, win_y = (game_surface.get_width() - win_w) // 2, (game_surface.get_height() - win_h) // 2
     box = pygame.Rect(win_x, win_y, win_w, win_h)
     
@@ -935,7 +936,7 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
     if hasattr(player, 'trade_history'):
         for trade in player.trade_history:
             # Added WIRE and REPAT to the master list!
-            if trade["action"] in ["SELL", "FINE", "TAX", "WIRE", "REPAT"]: 
+            if trade["action"] in ["SELL", "COVER", "FINE", "TAX", "WIRE", "REPAT"]: 
                 total_realized_pnl += trade.get("pnl", 0)
     stats_rect = pygame.Rect(box.x + 30, box.y + 70, win_w - 60, 90)
     pygame.draw.rect(game_surface, (30, 35, 45), stats_rect, border_radius=8)
@@ -1004,7 +1005,15 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
                     item_sign = "+" if item["pnl"] >= 0 else "-"
                     item_color = GREEN if item["pnl"] >= 0 else RED
                     pnl_surf = small_font.render(f"{item_sign}${abs(item['pnl']):,.2f} ({item_sign}{abs(item['pnl_pct']):.1f}%)", True, item_color)
-                    game_surface.blit(pnl_surf, (row_rect.right - pnl_surf.get_width() - 15, row_rect.y + 12))
+                    game_surface.blit(pnl_surf, (row_rect.right - pnl_surf.get_width() - 85, row_rect.y + 12))
+                    
+                    # Close position button
+                    close_btn_rect = pygame.Rect(row_rect.right - 70, row_rect.y + 8, 58, 28)
+                    pygame.draw.rect(game_surface, (120, 50, 50), close_btn_rect, border_radius=5)
+                    pygame.draw.rect(game_surface, (180, 70, 70), close_btn_rect, 1, border_radius=5)
+                    close_surf = small_font.render("Close", True, WHITE)
+                    game_surface.blit(close_surf, close_surf.get_rect(center=close_btn_rect.center))
+                    close_buttons.append((close_btn_rect, item["ticker"], item.get("type", "LONG")))
                 row_y += 50
 
     elif active_tab == "History":
@@ -1019,7 +1028,7 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
                 if row_rect.bottom > list_rect.top and row_rect.top < list_rect.bottom:
                     pygame.draw.rect(game_surface, (38, 42, 55), row_rect, border_radius=6)
                     
-                    # Make BUYS and REPAT green, everything else red
+                    # Make BUYS and REPAT green, SHORT/SELL/COVER contextual
                     action_col = GREEN if item["action"] in ["BUY", "REPAT"] else RED
                     game_surface.blit(small_font.render(item["action"], True, action_col), (row_rect.x + 15, row_rect.y + 12))
                     game_surface.blit(small_font.render(item["ticker"], True, WHITE), (row_rect.x + 85, row_rect.y + 12))
@@ -1040,7 +1049,7 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
                     game_surface.blit(tot_surf, (row_rect.x + 400, row_rect.y + 12))
                     
                     # Print the P&L math
-                    if item["action"] in ["SELL", "FINE", "TAX", "WIRE", "REPAT"]:
+                    if item["action"] in ["SELL", "COVER", "FINE", "TAX", "WIRE", "REPAT"]:
                         h_sign = "+" if item["pnl"] >= 0 else "-"
                         pnl_color = GREEN if item["pnl"] >= 0 else RED
                         pnl_surf = small_font.render(f"{h_sign}${abs(item['pnl']):,.2f} P&L", True, pnl_color)
@@ -1049,7 +1058,7 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
 
     game_surface.set_clip(None)
     max_scroll = min(0, list_rect.height - (items_count * 50))
-    return close_btn, max_scroll, holdings_btn, history_btn
+    return close_btn, max_scroll, holdings_btn, history_btn, close_buttons
 
 
 # ==========================================================
