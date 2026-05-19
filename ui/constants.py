@@ -17,9 +17,9 @@ LGRAY  = (200, 200, 220)
 
 # Character Definitions
 CHARACTERS = [
-    {"name": "Alex",   "file": "ui/characters/char1.png", "desc": "Balanced trader"},
-    {"name": "Morgan", "file": "ui/characters/char2.png", "desc": "Risk taker"},
-    {"name": "Jordan", "file": "ui/characters/char3.png", "desc": "Market analyst"},
+    {"name": "Michael",   "file": "ui/characters/char1.png", "desc": "Balanced trader"},
+    {"name": "Billy", "file": "ui/characters/char2.png", "desc": "Risk taker"},
+    {"name": "Jean", "file": "ui/characters/char3.png", "desc": "Market analyst"},
 ]
 
 # shop
