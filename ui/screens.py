@@ -54,13 +54,13 @@ def draw_char_select(game_surface, title_font, body_font, small_font, selected_i
                           small_font.render(char["desc"], True, LGRAY).get_rect(centerx=rect.centerx, y=360))
     back_btn    = pygame.Rect(60,   620, 180, 50)
     confirm_btn = pygame.Rect(1040, 620, 180, 50)
-    draw_button(game_surface, back_btn,    "← Back",    body_font, color=(80, 40, 80))
-    draw_button(game_surface, confirm_btn, "Confirm ✓", body_font, color=(30, 140, 80))
+    # STRIPPED ARROWS/CHECKMARKS
+    draw_button(game_surface, back_btn,    "< Back",    body_font, color=(80, 40, 80))
+    draw_button(game_surface, confirm_btn, "Confirm", body_font, color=(30, 140, 80))
     return card_rects, back_btn, confirm_btn
 
 
 def draw_text_input(game_surface, rect, text, font, placeholder_font, is_active=False, placeholder="Enter amount..."):
-    """Draws a text input field with the given text and optional cursor."""
     bg_color = (30, 35, 55) if is_active else (20, 22, 42)
     border_color = GOLD if is_active else (60, 70, 90)
     pygame.draw.rect(game_surface, bg_color, rect, border_radius=6)
@@ -86,7 +86,6 @@ def draw_text_input(game_surface, rect, text, font, placeholder_font, is_active=
 def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
                          selected_stock_idx=0, player_cash=0, player_portfolio=None,
                          amount_text="", input_active=False, ticker_offset=0):
-    """Draws the Stock Market interaction menu with candlestick charts and pattern info."""
     from .constants import BLUE, GOLD, GREEN, GRAY, RED, WHITE, DARK
     from .assets.stock_assets import CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info
 
@@ -102,7 +101,7 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
     pygame.draw.rect(game_surface, (10, 12, 28), box, border_radius=14)
     pygame.draw.rect(game_surface, BLUE, box, 2, border_radius=14)
 
-    game_surface.blit(body_font.render("STOCK MARKET", True, GOLD), (box.x + 30, box.y + 16))
+    game_surface.blit(body_font.render("[ STOCK MARKET ]", True, GOLD), (box.x + 30, box.y + 16))
     close_btn = draw_close_button(game_surface, box.right - 50, box.y + 12, small_font)
 
     strip_y = box.y + 55
@@ -123,8 +122,10 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
     arrow_size       = 28
     left_arrow_rect  = pygame.Rect(box.x + 6,              strip_y + 5, arrow_size, arrow_size)
     right_arrow_rect = pygame.Rect(box.x + BOX_W - arrow_size - 6, strip_y + 5, arrow_size, arrow_size)
-    game_surface.blit(body_font.render("◀", True, GOLD), body_font.render("◀", True, GOLD).get_rect(center=left_arrow_rect.center))
-    game_surface.blit(body_font.render("▶", True, GOLD), body_font.render("▶", True, GOLD).get_rect(center=right_arrow_rect.center))
+    
+    # REPLACED UNICODE ARROWS WITH PLAIN TEXT < >
+    game_surface.blit(body_font.render("<", True, GOLD), body_font.render("<", True, GOLD).get_rect(center=left_arrow_rect.center))
+    game_surface.blit(body_font.render(">", True, GOLD), body_font.render(">", True, GOLD).get_rect(center=right_arrow_rect.center))
 
     stock     = stocks[selected_stock_idx]
     content_y = strip_y + strip_h + 14
@@ -138,7 +139,8 @@ def draw_market_overlay(game_surface, body_font, hud_font, small_font, stocks,
     if len(stock.history) >= 2:
         change  = stock.price - stock.history[-2]
         pct     = (change / stock.history[-2]) * 100 if stock.history[-2] != 0 else 0
-        chg_str = f"{'▲' if change >= 0 else '▼'} {abs(change):.2f} ({abs(pct):.2f}%)"
+        # REPLACED UNICODE ARROWS WITH +/-
+        chg_str = f"{'+' if change >= 0 else '-'} {abs(change):.2f} ({abs(pct):.2f}%)"
         game_surface.blit(small_font.render(chg_str, True, GREEN if change >= 0 else RED), (left_x, content_y + 28))
     game_surface.blit(small_font.render(f"Candles: {len(stock.candles)}", True, GRAY), (left_x + 250, content_y + 28))
 
@@ -280,13 +282,13 @@ def draw_shop_overlay(game_surface, body_font, small_font, player, icon_coin, th
     box   = pygame.Rect(win_x, win_y, win_w, win_h)
     pygame.draw.rect(game_surface, (40, 45, 60), box, border_radius=8)
     pygame.draw.rect(game_surface, PANEL, box.inflate(-10, -50), border_radius=4)
-    game_surface.blit(body_font.render("Shop", True, WHITE), (box.x + 20, box.y + 10))
+    game_surface.blit(body_font.render("[ SHOP ]", True, GOLD), (box.x + 20, box.y + 10))
     close_btn   = draw_close_button(game_surface, box.right - 50, box.y + 10, small_font)
     categories  = ["Desks", "Walls", "Plants", "Upgrades"]
     tab_buttons = []
-    tab_x       = box.x + 150
+    tab_x       = box.x + 170
     for cat in categories:
-        tab_rect  = pygame.Rect(tab_x, box.y + 15, 100, 30)
+        tab_rect  = pygame.Rect(tab_x, box.y + 20, 100, 30)
         is_active = (cat == shop_tab)
         pygame.draw.rect(game_surface, (60, 80, 160) if is_active else (50, 55, 75), tab_rect, border_radius=4)
         if is_active:
@@ -375,7 +377,6 @@ def draw_confirmation_screen(game_surface, body_font, small_font, prompt_text):
 
 
 def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, available_employees, portraits):
-    """Draws a professional Staff Management Panel with Shop and Management sections."""
     from .constants import BLUE, GOLD, GREEN, GRAY, RED, PANEL, WHITE
     
     win_w, win_h = 1100, 600
@@ -389,7 +390,7 @@ def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, 
     pygame.draw.rect(game_surface, (35, 40, 55), header_rect, border_top_left_radius=12, border_top_right_radius=12)
     pygame.draw.line(game_surface, (80, 90, 110), (win_x, win_y + 60), (win_x + win_w, win_y + 60), 2)
     
-    title = body_font.render("⚡ STAFF MANAGEMENT", True, GOLD)
+    title = body_font.render("[ STAFF MANAGEMENT ]", True, GOLD)
     game_surface.blit(title, (win_x + 30, win_y + 15))
     
     close_btn = draw_close_button(game_surface, win_x + win_w - 60, win_y + 10, small_font)
@@ -405,7 +406,7 @@ def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, 
     pygame.draw.rect(game_surface, (30, 34, 45), left_box, border_radius=8)
     pygame.draw.rect(game_surface, (50, 60, 75), left_box, 2, border_radius=8)
     
-    shop_title = small_font.render("📋 AVAILABLE FOR HIRE", True, WHITE)
+    shop_title = small_font.render("> AVAILABLE FOR HIRE", True, WHITE)
     game_surface.blit(shop_title, (left_x + 15, left_y + 10))
     pygame.draw.line(game_surface, (60, 70, 85), (left_x + 10, left_y + 45), (left_x + left_w - 10, left_y + 45), 1)
     
@@ -416,7 +417,7 @@ def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, 
     pygame.draw.rect(game_surface, (30, 34, 45), right_box, border_radius=8)
     pygame.draw.rect(game_surface, (50, 60, 75), right_box, 2, border_radius=8)
     
-    active_title = small_font.render("👥 ACTIVE STAFF", True, WHITE)
+    active_title = small_font.render("> ACTIVE STAFF", True, WHITE)
     game_surface.blit(active_title, (right_x + 15, right_y + 10))
     
     staff_count = len(active_staff)
@@ -454,22 +455,22 @@ def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, 
         game_surface.blit(name_surf, (card_rect.x + 85, card_rect.y + 12))
         
         stats_y = card_rect.y + 42
-        energy_label = stat_font.render("⚡", True, GOLD)
+        energy_label = stat_font.render("ENG:", True, GOLD)
         game_surface.blit(energy_label, (card_rect.x + 85, stats_y))
         
         energy_text = stat_font.render(f"{emp['max_energy']}", True, (200, 200, 200))
-        game_surface.blit(energy_text, (card_rect.x + 110, stats_y))
+        game_surface.blit(energy_text, (card_rect.x + 130, stats_y))
         
-        speed_label = stat_font.render("🚀", True, BLUE)
+        speed_label = stat_font.render("SPD:", True, BLUE)
         game_surface.blit(speed_label, (card_rect.x + 180, stats_y))
         
         speed_text = stat_font.render(f"{emp['effectiveness']}x", True, (200, 200, 200))
-        game_surface.blit(speed_text, (card_rect.x + 210, stats_y))
+        game_surface.blit(speed_text, (card_rect.x + 225, stats_y))
         
         salary_rect = pygame.Rect(card_rect.x + 85, card_rect.y + 68, 160, 28)
         pygame.draw.rect(game_surface, (45, 50, 65), salary_rect, border_radius=5)
         
-        sal_text = stat_font.render(f"💰 ${emp['salary']}/hr", True, GOLD)
+        sal_text = stat_font.render(f"PAY: ${emp['salary']}/hr", True, GOLD)
         game_surface.blit(sal_text, (salary_rect.x + 8, salary_rect.y + 5))
         
         hire_btn = pygame.Rect(card_rect.right - 95, card_rect.y + 35, 80, 40)
@@ -537,7 +538,7 @@ def draw_staff_panel_overlay(game_surface, body_font, small_font, active_staff, 
             
             speed_y = active_card.y + 55
             speed_icon = pygame.font.Font("ui/fonts/Pixelify_Sans/static/PixelifySans-Bold.ttf", 16).render(
-                f"🚀 Speed: {emp_config['effectiveness']}x", True, BLUE
+                f"SPD: {emp_config['effectiveness']}x", True, BLUE
             )
             game_surface.blit(speed_icon, (active_card.x + 70, speed_y))
             
@@ -572,11 +573,11 @@ def draw_news_screen(game_surface, title_font, body_font, small_font, news_items
 
     pygame.draw.rect(game_surface, PANEL, pygame.Rect(0, 0, GAME_W, 100))
     pygame.draw.line(game_surface, GOLD, (0, 100), (GAME_W, 100), 2)
-    heading = title_font.render("MARKET NEWS", True, GOLD)
+    heading = title_font.render("[ MARKET NEWS ]", True, GOLD)
     game_surface.blit(heading, heading.get_rect(centerx=GAME_W // 2, y=20))
 
     back_btn = pygame.Rect(40, 25, 160, 50)
-    draw_button(game_surface, back_btn, "← Back", body_font, color=(80, 40, 80))
+    draw_button(game_surface, back_btn, "< Back", body_font, color=(80, 40, 80))
 
     IMPACT_COLORS = {
         "positive": (30, 160, 80),
@@ -632,14 +633,14 @@ def draw_news_screen(game_surface, title_font, body_font, small_font, news_items
         ts_surf = small_font.render(ts_str, True, (90, 100, 130))
         game_surface.blit(ts_surf, ts_surf.get_rect(right=card_rect.right - 16, bottom=card_rect.bottom - 10))
 
-        hint_surf = small_font.render("Click to expand ›", True, (70, 90, 140))
+        hint_surf = small_font.render("Click to expand >", True, (70, 90, 140))
         game_surface.blit(hint_surf, hint_surf.get_rect(right=card_rect.right - 16, y=card_y + 52))
 
         card_rects.append((card_rect, item))
 
     total_h = len(news_items) * (card_h + gap)
     if total_h > GAME_H - start_y:
-        hint = small_font.render("↑ ↓  Scroll for more", True, (70, 80, 110))
+        hint = small_font.render("Scroll for more", True, (70, 80, 110))
         game_surface.blit(hint, hint.get_rect(centerx=GAME_W // 2, y=GAME_H - 28))
 
     return back_btn, card_rects
@@ -721,7 +722,7 @@ def draw_news_detail(game_surface, title_font, body_font, small_font, item, game
             rx = bg.right + 10
 
     close_btn = pygame.Rect(panel.right - 150, panel.bottom - 60, 120, 40)
-    draw_button(game_surface, close_btn, "✕  Close", small_font, color=(120, 40, 40))
+    draw_button(game_surface, close_btn, "X  Close", small_font, color=(120, 40, 40))
     return close_btn
 
 
@@ -730,7 +731,7 @@ def draw_close_button(game_surface, x, y, font):
     pygame.draw.rect(game_surface, (180, 50, 50), btn_rect, border_radius=6)
     pygame.draw.rect(game_surface, (255, 100, 100), btn_rect, 2, border_radius=6)
     x_text = font.render("X", True, (255, 255, 255))
-    game_surface.blit(x_text, x_text.get_rect(center=btn_rect.center))
+    game_surface.blit(x_text, x_text.get_rect(centerx=btn_rect.centerx, centery=btn_rect.centery - 2))
     return btn_rect
 
 
@@ -760,7 +761,6 @@ def draw_sleep_bubble(game_surface, x, y, font):
 
 
 def draw_accounts_screen(game_surface, title_font, body_font, small_font, player):
-    """Draws a banking/accounts screen to manage offshore and tax data."""
     from .constants import GOLD, WHITE, GRAY, GREEN, RED
     win_w, win_h = 700, 450
     win_x, win_y = (game_surface.get_width() - win_w) // 2, (game_surface.get_height() - win_h) // 2
@@ -769,7 +769,7 @@ def draw_accounts_screen(game_surface, title_font, body_font, small_font, player
     pygame.draw.rect(game_surface, (20, 24, 32), box, border_radius=12)
     pygame.draw.rect(game_surface, (50, 60, 80), box, 3, border_radius=12)
     
-    title = body_font.render("🏦 Financial Accounts", True, GOLD)
+    title = body_font.render("[ FINANCIAL ACCOUNTS ]", True, GOLD)
     game_surface.blit(title, (box.x + 30, box.y + 20))
     
     close_btn = pygame.Rect(box.right - 50, box.y + 15, 35, 35)
@@ -848,7 +848,6 @@ def draw_day_night_cycle(game_surface, game_clock, player, computer_rect):
 
 
 def draw_portfolio_screen(game_surface, title_font, body_font, small_font, player, stocks, scroll_y, active_tab="Holdings"):
-    """Draws a live portfolio tracker with Realized/Unrealized P&L and History tabs."""
     from .constants import GOLD, WHITE, GRAY, GREEN, RED
     
     win_w, win_h = 880, 550
@@ -858,7 +857,7 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
     pygame.draw.rect(game_surface, (20, 24, 32), box, border_radius=12)
     pygame.draw.rect(game_surface, (50, 130, 255), box, 2, border_radius=12)
     
-    title = body_font.render("📊 Personal Portfolio", True, GOLD)
+    title = body_font.render("[ PERSONAL PORTFOLIO ]", True, GOLD)
     game_surface.blit(title, (box.x + 30, box.y + 20))
     close_btn = draw_close_button(game_surface, box.right - 50, box.y + 15, small_font)
 
@@ -890,7 +889,6 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
     total_realized_pnl = 0
     if hasattr(player, 'trade_history'):
         for trade in player.trade_history:
-            # Added WIRE and REPAT to the master list!
             if trade["action"] in ["SELL", "FINE", "TAX", "WIRE", "REPAT"]: 
                 total_realized_pnl += trade.get("pnl", 0)
     stats_rect = pygame.Rect(box.x + 30, box.y + 70, win_w - 60, 90)
@@ -965,12 +963,10 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
                 if row_rect.bottom > list_rect.top and row_rect.top < list_rect.bottom:
                     pygame.draw.rect(game_surface, (38, 42, 55), row_rect, border_radius=6)
                     
-                    # Make BUYS and REPAT green, everything else red
                     action_col = GREEN if item["action"] in ["BUY", "REPAT"] else RED
                     game_surface.blit(small_font.render(item["action"], True, action_col), (row_rect.x + 15, row_rect.y + 12))
                     game_surface.blit(small_font.render(item["ticker"], True, WHITE), (row_rect.x + 85, row_rect.y + 12))
                     
-                    # Custom text for special actions
                     if item["action"] in ["FINE", "TAX", "WIRE", "REPAT"]:
                         if item["action"] in ["FINE", "TAX"]:
                             lbl, lbl_col = "FEDERAL DEDUCTION", (180, 60, 60)
@@ -985,7 +981,6 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
                     tot_surf = small_font.render(f"Total: ${item['total']:,.2f}", True, WHITE)
                     game_surface.blit(tot_surf, (row_rect.x + 400, row_rect.y + 12))
                     
-                    # Print the P&L math
                     if item["action"] in ["SELL", "FINE", "TAX", "WIRE", "REPAT"]:
                         h_sign = "+" if item["pnl"] >= 0 else "-"
                         pnl_color = GREEN if item["pnl"] >= 0 else RED
@@ -1045,7 +1040,7 @@ def draw_settings_overlay(game_surface, title_font, body_font, small_font, game_
     pygame.draw.rect(game_surface, (25, 30, 45), panel, border_radius=12)
     pygame.draw.rect(game_surface, GOLD, panel, 2, border_radius=12)
 
-    title = body_font.render("⚙ SETTINGS", True, GOLD)
+    title = body_font.render("[ SETTINGS ]", True, GOLD)
     game_surface.blit(title, (panel.x + 30, panel.y + 20))
     close_btn = draw_close_button(game_surface, panel.right - 55, panel.y + 15, small_font)
 
@@ -1083,7 +1078,6 @@ def draw_settings_overlay(game_surface, title_font, body_font, small_font, game_
         pygame.draw.rect(game_surface, BLUE, popup, 2, border_radius=10)
         game_surface.blit(body_font.render("CONTROLS MANUAL", True, GOLD), (popup.x + 20, popup.y + 15))
 
-        # --- EXTENSIVE CONTROLS DOCUMENTATION ---
         controls = [
             "WASD / Arrow Keys - Character Movement", 
             "E - Interact with Main Computer Desk", 

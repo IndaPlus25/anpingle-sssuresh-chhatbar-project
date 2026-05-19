@@ -56,8 +56,8 @@ def draw_top_bar(game_surface, hud_font, small_font, bold_font, player, icon_coi
     
     menu_btn = pygame.Rect(GAME_W - 55, 8, 45, 34)
     pygame.draw.rect(game_surface, (40, 40, 60), menu_btn, border_radius=4)
-    menu_lines = small_font.render("≡", True, LGRAY)
-    game_surface.blit(menu_lines, menu_lines.get_rect(center=menu_btn.center))
+    # menu_lines = small_font.render("≡", True, LGRAY)
+    # game_surface.blit(menu_lines, menu_lines.get_rect(center=menu_btn.center))
     return menu_btn
 def draw_clock_overlay(game_surface, small_font, hud_font, game_clock):
     #Draws clock
