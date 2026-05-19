@@ -56,6 +56,45 @@ class Player:
         for name in to_remove:
             del self.shorts[name]
 
+    def close_long_position(self, stock_name, current_price):
+        """Closes an entire long position, selling all shares at current_price.
+        Returns (shares_sold, realized_pnl) or (0, 0) if no position found.
+        """
+        shares = self.portfolio.get(stock_name, 0)
+        if shares <= 0:
+            return 0, 0
+        avg_cost = self.cost_basis.get(stock_name, current_price) if hasattr(self, 'cost_basis') else current_price
+        proceeds = shares * current_price
+        realized_pnl = proceeds - (shares * avg_cost)
+        self.cash += proceeds
+        del self.portfolio[stock_name]
+        if hasattr(self, 'cost_basis') and stock_name in self.cost_basis:
+            del self.cost_basis[stock_name]
+        if not hasattr(self, 'taxable_profit'):
+            self.taxable_profit = 0
+        self.taxable_profit += realized_pnl
+        return shares, realized_pnl
+
+    def close_short_position(self, stock_name, current_price):
+        """Closes an entire short position, buying back all shares at current_price.
+        Returns (shares_closed, realized_pnl) or (0, 0) if no position found.
+        """
+        if stock_name not in self.shorts:
+            return 0, 0
+        pos = self.shorts[stock_name]
+        qty = pos["qty"]
+        if qty <= 0:
+            return 0, 0
+        entry_price = pos["entry_price"]
+        realized_pnl = (entry_price - current_price) * qty
+        buyback_cost = qty * current_price
+        self.cash -= buyback_cost
+        del self.shorts[stock_name]
+        if not hasattr(self, 'taxable_profit'):
+            self.taxable_profit = 0
+        self.taxable_profit += realized_pnl
+        return qty, realized_pnl
+
     def move(self, dx, dy, max_w, max_h):
         if dx != 0 or dy != 0:
             self.is_moving = True
