@@ -1152,6 +1152,7 @@ def draw_settings_overlay(game_surface, title_font, body_font, small_font, game_
             "ESC - Settings Overlay / Close active panels", 
             "Q - Force Exit Active Trade Desk Screen",
             "B - Accounts",
+            "F5 - Save/Load Progress",
             "Mouse Click - Menu & Interface Buttons"
         ]
         yy = popup.y + 55
@@ -1186,3 +1187,53 @@ def handle_settings_click(buttons, mouse_pos):
     elif buttons["brightness_plus"].collidepoint(mouse_pos): _brightness = min(1.0, _brightness + 0.1)
     elif buttons["controls"].collidepoint(mouse_pos): _show_controls = True
     elif buttons["close"].collidepoint(mouse_pos): close_settings()
+def draw_save_load_screen(game_surface, body_font, small_font, slots_data, mode="save"):
+    from .constants import GOLD, WHITE, GRAY, GREEN, PANEL, DARK, BLUE
+    
+    win_w, win_h = 600, 500
+    win_x, win_y = (game_surface.get_width() - win_w) // 2, (game_surface.get_height() - win_h) // 2
+    box = pygame.Rect(win_x, win_y, win_w, win_h)
+    
+    overlay = pygame.Surface(game_surface.get_size(), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))
+    game_surface.blit(overlay, (0, 0))
+    
+    pygame.draw.rect(game_surface, (25, 30, 45), box, border_radius=12)
+    pygame.draw.rect(game_surface, GOLD if mode == "save" else BLUE, box, 2, border_radius=12)
+    
+    title_text = "[ SAVE GAME ]" if mode == "save" else "[ LOAD GAME ]"
+    game_surface.blit(body_font.render(title_text, True, GOLD if mode == "save" else BLUE), (box.x + 30, box.y + 20))
+    close_btn = draw_close_button(game_surface, box.right - 55, box.y + 15, small_font)
+    
+    save_tab = pygame.Rect(box.x + 280, box.y + 25, 100, 35)
+    load_tab = pygame.Rect(box.x + 400, box.y + 25, 100, 35)
+    
+    pygame.draw.rect(game_surface, (60, 80, 160) if mode == "save" else (40, 45, 60), save_tab, border_radius=6)
+    game_surface.blit(small_font.render("SAVE", True, WHITE), (save_tab.x + 25, save_tab.y + 8))
+    pygame.draw.rect(game_surface, (60, 80, 160) if mode == "load" else (40, 45, 60), load_tab, border_radius=6)
+    game_surface.blit(small_font.render("LOAD", True, WHITE), (load_tab.x + 25, load_tab.y + 8))
+    
+    slot_buttons = []
+    start_y = box.y + 80
+    
+    for i, slot in enumerate(slots_data):
+        slot_rect = pygame.Rect(box.x + 30, start_y + (i * 90), win_w - 60, 75)
+        is_empty = slot["empty"]
+        
+        pygame.draw.rect(game_surface, (35, 40, 55) if is_empty else (45, 55, 75), slot_rect, border_radius=8)
+        pygame.draw.rect(game_surface, (70, 80, 100), slot_rect, 1, border_radius=8)
+        game_surface.blit(small_font.render(f"SLOT {slot['slot']}", True, WHITE), (slot_rect.x + 20, slot_rect.y + 20))
+        
+        if is_empty:
+            game_surface.blit(small_font.render("[ EMPTY SLOT ]", True, GRAY), (slot_rect.x + 150, slot_rect.y + 25))
+            btn_col, btn_text = (GREEN, "SAVE") if mode == "save" else (GRAY, "---")
+        else:
+            game_surface.blit(small_font.render(f"Date: {slot['date']}", True, LGRAY), (slot_rect.x + 150, slot_rect.y + 15))
+            game_surface.blit(small_font.render(f"Cash: ${slot['cash']:,.0f}", True, GOLD), (slot_rect.x + 150, slot_rect.y + 40))
+            btn_col, btn_text = ((180, 140, 40), "OVERWRITE") if mode == "save" else (GREEN, "LOAD")
+            
+        action_btn = pygame.Rect(slot_rect.right - 140, slot_rect.y + 15, 120, 45)
+        draw_button(game_surface, action_btn, btn_text, small_font, color=btn_col)
+        slot_buttons.append({"rect": action_btn, "slot_id": slot['slot'], "empty": is_empty})
+        
+    return close_btn, save_tab, load_tab, slot_buttons

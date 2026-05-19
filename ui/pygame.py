@@ -10,8 +10,9 @@ from .screens import (
     draw_staff_panel_overlay, draw_accounts_screen, draw_interaction_prompt, 
     draw_settings_overlay, open_settings, close_settings, is_settings_open, 
     get_music_volume, get_sfx_volume, apply_brightness_overlay, handle_settings_click,
-    draw_portfolio_screen
+    draw_portfolio_screen, draw_save_load_screen
 )
+from features.save_manager import get_save_slots, save_game, load_game_data
 from .assets.stock_assets import (
     CANDLE_COLORS, PATTERN_PROGRESS_BG, get_pattern_color, get_pattern_info
 )
@@ -272,7 +273,11 @@ def run(game):
     market_buy_btn = market_short_btn = market_amount_input = pygame.Rect(0,0,0,0)
     market_amount_text = ""
     market_input_active = False
-    
+    save_load_open = False
+    save_load_mode = "save"
+    save_slots_data = get_save_slots()
+    sl_close_btn = sl_save_tab = sl_load_tab = pygame.Rect(0,0,0,0)
+    sl_slot_buttons = []
     shop_tab = "Desks"
     shop_scroll_y = 0
     owned_items = ["desk1", "wall1"]
@@ -386,6 +391,12 @@ def run(game):
                 # =========================
                 # IRS TEST TRIGGER (F12)
                 # =========================
+                if event.key == pygame.K_F5 and state == "game" and not is_settings_open():
+                    save_load_open = not save_load_open
+                    if save_load_open: 
+                        save_slots_data = get_save_slots()
+                        market_open = shop_open = staff_open = accounts_open = portfolio_open = news_open = False
+
                 if event.key == pygame.K_F12 and state == "game" and not audit_active:
                     if not hasattr(player, 'taxable_profit'): player.taxable_profit = 0
                     
@@ -655,6 +666,49 @@ def run(game):
                                 if back_btn.collidepoint(gpt): news_open = False
                                 for card_rect, item in card_rects:
                                     if card_rect and card_rect.collidepoint(gpt): selected_news_item = item; break
+                        if save_load_open:
+                            if sl_close_btn.collidepoint(gpt): save_load_open = False; clicked_valid_button = True
+                            elif sl_save_tab.collidepoint(gpt): save_load_mode = "save"; clicked_valid_button = True
+                            elif sl_load_tab.collidepoint(gpt): save_load_mode = "load"; clicked_valid_button = True
+                            else:
+                                for btn in sl_slot_buttons:
+                                    if btn["rect"].collidepoint(gpt):
+                                        clicked_valid_button = True
+                                        slot_id = btn["slot_id"]
+                                        if save_load_mode == "save":
+                                            save_game(slot_id, player, game_clock, game, active_staff, owned_items, placed_props, assets.get("current_desk_id"), assets.get("current_wall_id"), hours_until_audit)
+                                            save_slots_data = get_save_slots()
+                                        elif save_load_mode == "load" and not btn["empty"]:
+                                            data = load_game_data(slot_id)
+                                            if data:
+                                                player.cash = data["player"].get("cash", 0)
+                                                player.portfolio = data["player"].get("portfolio", {})
+                                                player.shorts = data["player"].get("shorts", {})
+                                                player.cost_basis = data["player"].get("cost_basis", {})
+                                                player.trade_history = data["player"].get("trade_history", [])
+                                                player.offshore = data["player"].get("offshore", 0)
+                                                player.owed_taxes = data["player"].get("owed_taxes", 0)
+                                                player.taxable_profit = data["player"].get("taxable_profit", 0)
+                                                game_clock.current_time = game_clock.current_time.replace(day=data["clock"].get("day", 1), hour=data["clock"].get("hour", 9), minute=data["clock"].get("minute", 0))
+                                                hours_until_audit = data.get("hours_until_audit", 168)
+                                                owned_items = data["shop"].get("owned_items", [])
+                                                placed_props = data["shop"].get("placed_props", [])
+                                                assets["current_desk_id"] = data["shop"].get("equipped_desk")
+                                                assets["current_wall_id"] = data["shop"].get("equipped_wall")
+                                                from features.npc import EmployeeNPC
+                                                active_staff.clear()
+                                                for s in data.get("staff", []):
+                                                    emp = EmployeeNPC(GAME_W//2, GAME_H//2, s["config"])
+                                                    emp.energy = s.get("energy", 100)
+                                                    emp.role = s.get("role", "Salesman")
+                                                    active_staff[s["id"]] = emp
+                                                for s in game.stocks:
+                                                    s_data = data["stocks"].get(s.name)
+                                                    if s_data:
+                                                        s.price = s_data["price"]
+                                                        s.history = s_data["history"]
+                                                        s.candles = []
+                                                save_load_open = False
                 if clicked_valid_button: play(sounds, "click")
 
         # ── Frame Buffer Graphics Pass ──────────────────────────────
@@ -949,7 +1003,8 @@ def run(game):
                     player.cash, player.portfolio, player.shorts,
                     market_amount_text, market_input_active, ticker_offset
                 )
-                
+            if save_load_open:
+                sl_close_btn, sl_save_tab, sl_load_tab, sl_slot_buttons = draw_save_load_screen(game_surface, assets["body_font"], assets["small_font"], save_slots_data, save_load_mode)
             if staff_open:
                 staff_buttons, staff_close_btn = draw_staff_panel_overlay(
                     game_surface, assets["body_font"], assets["small_font"], 
