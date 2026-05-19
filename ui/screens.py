@@ -885,8 +885,10 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
     stock_dict = {s.name: s for s in stocks}
     total_stock_value = 0
     total_initial_cost = 0
+    total_short_exposure = 0
     holdings = []
     
+    # Long positions
     if hasattr(player, 'portfolio'):
         for ticker, shares in player.portfolio.items():
             if shares > 0 and ticker in stock_dict:
@@ -901,11 +903,33 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
                 
                 holdings.append({
                     "ticker": ticker, "shares": shares, "price": current_price, 
-                    "avg_cost": avg_cost, "value": live_value, "pnl": pnl, "pnl_pct": pnl_pct
+                    "avg_cost": avg_cost, "value": live_value, "pnl": pnl, "pnl_pct": pnl_pct,
+                    "type": "LONG"
                 })
+
+    # Short positions
+    if hasattr(player, 'shorts'):
+        for ticker, pos in player.shorts.items():
+            if pos["qty"] > 0 and ticker in stock_dict:
+                current_price = stock_dict[ticker].price
+                entry_price = pos["entry_price"]
+                qty = pos["qty"]
+                # Short exposure: what it would cost to buy back
+                exposure = qty * current_price
+                total_short_exposure += exposure
+                initial_value = qty * entry_price
+                # Inverse P&L: profit when price drops below entry
+                pnl = (entry_price - current_price) * qty
+                pnl_pct = (pnl / initial_value * 100) if initial_value > 0 else 0
                 
-    holdings.sort(key=lambda x: x["value"], reverse=True)
-    net_worth = player.cash + total_stock_value + player.offshore - player.owed_taxes
+                holdings.append({
+                    "ticker": ticker, "shares": qty, "price": current_price,
+                    "avg_cost": entry_price, "value": exposure, "pnl": pnl, "pnl_pct": pnl_pct,
+                    "type": "SHORT"
+                })
+
+    holdings.sort(key=lambda x: abs(x["value"]), reverse=True)
+    net_worth = player.cash + total_stock_value - total_short_exposure + player.offshore - player.owed_taxes
 
     total_realized_pnl = 0
     if hasattr(player, 'trade_history'):
@@ -920,8 +944,9 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
     nw_sign = "-" if net_worth < 0 else ""
     game_surface.blit(small_font.render(f"{nw_sign}${abs(net_worth):,.2f}", True, GREEN if net_worth >= 0 else RED), (stats_rect.x + 20, stats_rect.y + 45))
     
-    global_pnl = total_stock_value - total_initial_cost
-    global_pnl_pct = (global_pnl / total_initial_cost * 100) if total_initial_cost > 0 else 0
+    global_pnl = sum(h["pnl"] for h in holdings)
+    total_basis = sum(h["shares"] * h["avg_cost"] for h in holdings)
+    global_pnl_pct = (global_pnl / total_basis * 100) if total_basis > 0 else 0
     pnl_color = GREEN if global_pnl >= 0 else RED
     g_sign = "+" if global_pnl >= 0 else "-"
     
@@ -962,10 +987,19 @@ def draw_portfolio_screen(game_surface, title_font, body_font, small_font, playe
                 row_rect = pygame.Rect(box.x + 30, row_y, win_w - 60, 45)
                 if row_rect.bottom > list_rect.top and row_rect.top < list_rect.bottom:
                     pygame.draw.rect(game_surface, (38, 42, 55), row_rect, border_radius=6)
-                    game_surface.blit(small_font.render(item["ticker"], True, WHITE), (row_rect.x + 15, row_rect.y + 12))
-                    game_surface.blit(small_font.render(f"{item['shares']} shrs @ ${item['avg_cost']:.2f}", True, GRAY), (row_rect.x + 110, row_rect.y + 12))
-                    val_surf = small_font.render(f"Value: ${item['value']:,.2f}", True, WHITE)
-                    game_surface.blit(val_surf, (row_rect.x + 340, row_rect.y + 12))
+                    
+                    # Type badge (LONG / SHORT)
+                    is_short = item.get("type") == "SHORT"
+                    badge_text = "SHORT" if is_short else "LONG"
+                    badge_color = (180, 60, 60) if is_short else (30, 140, 80)
+                    badge_surf = small_font.render(badge_text, True, badge_color)
+                    game_surface.blit(badge_surf, (row_rect.x + 15, row_rect.y + 12))
+                    
+                    game_surface.blit(small_font.render(item["ticker"], True, WHITE), (row_rect.x + 85, row_rect.y + 12))
+                    cost_label = "entry" if is_short else "@"
+                    game_surface.blit(small_font.render(f"{item['shares']} shrs {cost_label} ${item['avg_cost']:.2f}", True, GRAY), (row_rect.x + 160, row_rect.y + 12))
+                    val_surf = small_font.render(f"${item['value']:,.2f}", True, WHITE)
+                    game_surface.blit(val_surf, (row_rect.x + 400, row_rect.y + 12))
                     
                     item_sign = "+" if item["pnl"] >= 0 else "-"
                     item_color = GREEN if item["pnl"] >= 0 else RED
