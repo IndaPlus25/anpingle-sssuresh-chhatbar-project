@@ -41,26 +41,42 @@ A real-time, fast-paced single-player corporate simulation game built in Python 
 
 ---
 
-## 📂 Project Architecture
+## 📁 Project Architecture
+
+The project is structured into distinct modules separating the core gameplay features, game state logic, and user interface. 
 
 ```text
-├── main.py                    # Game launch orchestration bootstrap hook
-├── ui/
-│   ├── pygame.py              # Main Engine Loop, Hardware Input, Event Routers, Game Context State
-│   ├── screens.py             # Render Pipeline Layouts (Overlays, Settings, Portfolio, Shops)
-│   ├── constants.py           # Global resolution metrics, screen flags, asset mapping specs
-│   └── assets/
-│       ├── music/             # CD-quality audio tracks, loop buffers, hardware mixing configurations
-│       └── stock_assets.py    # Color aliases, grid configs, trendline calculations
-├── features/
-│   ├── assets.py              # Asset loaders (Spritesheets, textures, audio configurations)
-│   ├── clock.py               # Time keeping context tracking simulation cycles
-│   ├── hud.py                 # Persistent UI balance readouts, animated ticker ribbons
-│   ├── irs.py                 # IRS agent movement pathways, speech indicators, warning assets
-│   ├── npc.py                 # Employee NPCs behavioral routines, energy tracking, role traits
-│   ├── placement.py           # Custom placeable grid boundary validation calculations
-│   └── player.py              # Physics handlers, velocity matrices, animation trackers
-└── game/
-    ├── news.py                # Narrative breaking story string generators
-    └── stocks/
-        └── patterns.py        # Trend pattern injection dictionaries
+.
+├── features/                # Core game mechanics and engine features
+│   ├── animations.py        # Handles sprite and UI animations
+│   ├── assets.py            # Asset loading and management
+│   ├── clock.py             # In-game time and scheduling
+│   ├── collision.py         # Hitbox and collision detection logic
+│   ├── hud.py               # Heads-up display rendering logic
+│   ├── interaction.py       # Player interaction with world objects
+│   ├── irs.py               # In-game revenue/tax system logic
+│   ├── npc.py               # Non-player character behaviors
+│   ├── placement.py         # Object/building placement mechanics
+│   ├── player.py            # Core player mechanics and movement
+│   └── save_manager.py      # Serialization for saving/loading progress
+│
+├── game/                    # Game state, economy, and progression systems
+│   ├── stocks/              # Stock market system mechanics
+│   ├── game.py              # Main game loop and state management
+│   ├── news.py              # In-game news event generator
+│   └── player.py            # Player data and progression state
+│
+├── saves/                   # Directory containing generated save files
+│
+├── ui/                      # User interface, rendering, and screens
+│   ├── assets/              # UI-specific graphical assets
+│   ├── backgrounds/         # Background imagery (contains /walls)
+│   ├── characters/          # Character portraits and sprites
+│   ├── fonts/               # Custom typography
+│   ├── constants.py         # Shared UI configurations (colors, sizes)
+│   ├── pygame.py            # Pygame wrapper and initialization
+│   └── screens.py           # Menus and interface screen definitions
+│
+├── .gitignore               # Ignored files for Git version control
+├── main.py                  # Main entry point to launch the application
+└── README.md                # Project documentation
