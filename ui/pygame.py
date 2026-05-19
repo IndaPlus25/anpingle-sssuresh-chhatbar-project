@@ -47,7 +47,7 @@ CANDLE_WIDTH  = 10
 CANDLE_SPACING = 4
 
 # ==========================================
-# AUDIO STATE TRACKING (Fixed Addresses)
+# AUDIO STATE TRACKING (Fixed Addresses Folder Structure)
 # ==========================================
 MUSIC_BGM  = "ui/assets/music/prettyjohn1-corporate-background-music_33sec-483404.wav"
 MUSIC_NEWS = "ui/assets/music/sonican-news-music-information-epic-30-seconds-471012.wav"
@@ -77,7 +77,10 @@ def play(sounds, name):
 
 def switch_music(track_name, filepath, volume=0.3):
     global _CURRENTLY_PLAYING_TRACK
-    if _CURRENTLY_PLAYING_TRACK == track_name: return
+    if _CURRENTLY_PLAYING_TRACK == track_name: 
+        # Keep volume dynamic even if track doesn't switch
+        pygame.mixer.music.set_volume(volume)
+        return
     if not os.path.exists(filepath):
         print(f"[Audio] Missing music file at target: {filepath}")
         return
@@ -93,8 +96,9 @@ def switch_music(track_name, filepath, volume=0.3):
         print(f"[Audio] Music error ({track_name}): {e}")
         _CURRENTLY_PLAYING_TRACK = None
 
-def music_play_bgm(): switch_music("bgm", MUSIC_BGM, 0.30)
-def music_play_news(): switch_music("news", MUSIC_NEWS, 0.45)
+# --- RESTORED DYNAMIC VOLUME LINK TO TRACK MIXERS ---
+def music_play_bgm(): switch_music("bgm", MUSIC_BGM, get_music_volume())
+def music_play_news(): switch_music("news", MUSIC_NEWS, get_music_volume())
 
 def draw_candle(screen, x, y, ohlc, height_scale, min_price, max_price):
     open_p, high, low, close = ohlc
@@ -264,7 +268,7 @@ def run(game):
     tab_buttons = []
     selected_stock_idx = 0
     market_arrow_left = market_arrow_right = market_close_btn = pygame.Rect(0,0,0,0)
-    market_buy_btn = market_sell_btn = market_amount_input = pygame.Rect(0,0,0,0)
+    market_buy_btn = market_short_btn = market_amount_input = pygame.Rect(0,0,0,0)
     market_amount_text = ""
     market_input_active = False
     
@@ -320,6 +324,7 @@ def run(game):
     while running:
         now = pygame.time.get_ticks()
 
+        # Dynamic live evaluation sync triggers track volume changes safely context
         if news_open != last_news_state:
             if news_open: music_play_news()
             else: music_play_bgm()
@@ -463,7 +468,9 @@ def run(game):
                 
                 if is_settings_open() and settings_buttons:
                     handle_settings_click(settings_buttons, game_mouse)
-                    pygame.mixer.music.set_volume(get_music_volume())
+                    # Sync hardware runtime audio mixer settings instantly upon click capture context loop hook
+                    if _CURRENTLY_PLAYING_TRACK == "news": music_play_news()
+                    else: music_play_bgm()
                     for sound in sounds.values(): sound.set_volume(get_sfx_volume())
                     continue
 
@@ -565,6 +572,28 @@ def run(game):
                                         del player.portfolio[current_stock.name]
                                         if hasattr(player, 'cost_basis') and current_stock.name in player.cost_basis: del player.cost_basis[current_stock.name]
                                     market_amount_text = ""
+                            # Amount input field - toggle active state
+                            if market_amount_input.collidepoint(gpt):
+                                market_input_active = True
+                            else:
+                                market_input_active = False
+
+                            # Buy/Short buttons
+                            current_stock = game.stocks[selected_stock_idx]
+                            try:
+                                amount = int(market_amount_text) if market_amount_text else 0
+                            except ValueError:
+                                amount = 0
+
+                            if market_buy_btn.collidepoint(gpt) and amount > 0:
+                                if player.buy_stock(current_stock.name, current_stock.price, amount):
+                                    play(sounds, "buy")
+                                    market_amount_text = ""
+
+                            if market_short_btn.collidepoint(gpt) and amount > 0:
+                                play(sounds, "buy")
+                                player.short_stock(current_stock.name, current_stock.price, amount)
+                                market_amount_text = ""
                         elif shop_open:
                             if shop_close_btn.collidepoint(gpt) or any(t["rect"].collidepoint(gpt) for t in tab_buttons) or any(b[0].collidepoint(gpt) for b in buy_buttons): clicked_valid_button = True
                             if shop_close_btn.collidepoint(gpt): shop_open = False
@@ -641,6 +670,8 @@ def run(game):
             if pygame.time.get_ticks() - last_update > 1000:
                 stock_prev_prices = {stock.name: stock.price for stock in game.stocks}
                 game.update_stocks()
+                player.settle_shorts(game.stocks, stock_prev_prices)
+
                 last_update = pygame.time.get_ticks()
 
             current_time = pygame.time.get_ticks()
@@ -651,7 +682,7 @@ def run(game):
                 news_interval = random.randint(10000, 30000)
 
             game_surface.blit(assets["bg"], (0, 0))
-            draw_button(game_surface, news_btn_rect, "📰 News", assets["small_font"], color=(40, 80, 120))
+            draw_button(game_surface, news_btn_rect, "News", assets["small_font"], color=(40, 80, 120))
 
             for stock in game.stocks:
                 if not stock.is_pattern_active() and random.random() < PATTERN_INJECT_CHANCE:
@@ -709,12 +740,19 @@ def run(game):
                 game.stocks, stock_prev_prices
             )
 
-            draw_button(game_surface, news_btn_rect, "📰 News", assets["small_font"], color=(40, 80, 120))
+            hm_x, hm_y = menu_btn_rect.right - 33, menu_btn_rect.y + 11
+            pygame.draw.line(game_surface, (255, 255, 255), (hm_x, hm_y), (hm_x + 20, hm_y), 3)
+            pygame.draw.line(game_surface, (255, 255, 255), (hm_x, hm_y + 7), (hm_x + 20, hm_y + 7), 3)
+            pygame.draw.line(game_surface, (255, 255, 255), (hm_x, hm_y + 14), (hm_x + 20, hm_y + 14), 3)
+
+
+            draw_button(game_surface, news_btn_rect, "News", assets["small_font"], color=(40, 80, 120))
 
             ticker_offset -= 1.5
             if ticker_offset < -(len(game.stocks) * 180): ticker_offset = 0
             assets["placed_props"] = placed_props
-            if not any([placement_mode,market_open, shop_open, staff_open, accounts_open, confirm_open, wiring_funds, portfolio_open]):
+
+            if not any([placement_mode, market_open, shop_open, staff_open, accounts_open, portfolio_open, confirm_open, wiring_funds, is_settings_open()]):
                 anim_frame = handle_player_movement(player, 3.5, anim_frame, assets)
                 game_clock.update(dt)
                 game_hour_timer += dt
@@ -893,9 +931,50 @@ def run(game):
                 pygame.draw.rect(game_surface, (255, 215, 0), msg_rect, 3, border_radius=10)
                 msg_surf = assets["small_font"].render(post_audit_message, True, (255, 215, 0))
                 game_surface.blit(msg_surf, msg_surf.get_rect(center=msg_rect.center))
-                irs_agent.update(dt, assets); irs_agent.draw(game_surface, assets["small_font"], assets.get("irs_anims"))
+                irs_agent.update(dt, assets) 
+                irs_agent.draw(game_surface, assets["small_font"], assets.get("irs_anims"))
 
-            # --- RENDER OVERLAYSCONTEXT ---
+
+            # =========================
+            # UI OVERLAYS
+            # =========================
+            if market_open:
+                market_arrow_left, market_arrow_right, market_buy_btn, market_short_btn, market_amount_input, market_close_btn = draw_market_overlay(
+                    game_surface, assets["body_font"], assets["hud_font"],
+                    assets["small_font"], game.stocks, selected_stock_idx,
+                    player.cash, player.portfolio, player.shorts,
+                    market_amount_text, market_input_active, ticker_offset
+                )
+                
+            if staff_open:
+                staff_buttons, staff_close_btn = draw_staff_panel_overlay(
+                    game_surface, assets["body_font"], assets["small_font"], 
+                    active_staff, AVAILABLE_EMPLOYEES, assets["staff_portraits"]
+                )
+                
+            if shop_open:
+                equipped_items = {
+                    "Desks": assets.get("current_desk_id"),
+                    "Walls": assets.get("current_wall_id"),
+                }
+                buy_buttons, tab_buttons, shop_scroll_y, shop_close_btn = draw_shop_overlay(
+                    game_surface, assets["body_font"], assets["small_font"], player,
+                    assets["icon_coin"], assets.get("shop_thumbnails", {}),
+                    owned_items, equipped_items, shop_tab, shop_scroll_y
+                )
+            
+
+            if accounts_open:
+                accounts_close_btn, repatriate_btn = draw_accounts_screen(
+                    game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player
+                )
+                                  
+            if confirm_open and pending_item:
+                yes_btn, no_btn = draw_confirmation_screen(
+                    game_surface, assets["body_font"], assets["small_font"],
+                    f"Buy {pending_item['name']}?"
+                )
+
             if portfolio_open: portfolio_close_btn, portfolio_max_scroll, port_holdings_btn, port_history_btn = draw_portfolio_screen(game_surface, assets["title_font"], assets["body_font"], assets["small_font"], player, game.stocks, portfolio_scroll_y, portfolio_tab)
             if market_open: market_arrow_left, market_arrow_right, market_buy_btn, market_sell_btn, market_amount_input, market_close_btn = draw_market_overlay(game_surface, assets["body_font"], assets["hud_font"], assets["small_font"], game.stocks, selected_stock_idx, player.cash, player.portfolio, market_amount_text, market_input_active, ticker_offset)
             if staff_open: staff_buttons, staff_close_btn = draw_staff_panel_overlay(game_surface, assets["body_font"], assets["small_font"], active_staff, AVAILABLE_EMPLOYEES, assets["staff_portraits"])
